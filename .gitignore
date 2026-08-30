@@ -1,0 +1,8 @@
+node_modules/
+session/
+data/
+*.log
+.env
+.DS_Store
+_*.mjs
+_*.webp

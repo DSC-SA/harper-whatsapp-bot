@@ -1,0 +1,198 @@
+import { config } from '../../config.js';
+import {
+  replyText,
+  getMentionedJids,
+  getCleanUserNumber,
+  parseNumbers,
+} from '../helpers.js';
+import { getGroup, saveGroup, getWarns, setWarns, addWarn, resetWarns } from '../state.js';
+
+const jidForNumber = (n) => `${n}@s.whatsapp.net`;
+
+function targetJids(ctx) {
+  const { msg } = ctx;
+  const mentioned = getMentionedJids(msg) || [];
+  const quoted = ctx.quotedSender || null;
+  const nums = parseNumbers(ctx.argsText || '');
+  const fromNums = nums.filter((n) => n.length >= 7).map((n) => jidForNumber(n));
+  const set = new Set([...mentioned, ...(quoted ? [quoted] : []), ...fromNums]);
+  return [...set].filter(Boolean);
+}
+
+export default [
+  {
+    name: 'kick',
+    aliases: ['remove', 'rm'],
+    group: true,
+    admin: true,
+    run: async (ctx, args) => {
+      const { sock, msg, jid } = ctx;
+      const targets = targetJids(ctx);
+      if (!targets.length) return replyText(sock, msg, 'Mention or list the members to kick.');
+      try {
+        await sock.groupParticipantsUpdate(jid, targets, 'remove');
+        return replyText(sock, msg, `Kicked ${targets.length} member(s).`);
+      } catch (e) {
+        return replyText(sock, msg, `Kick failed: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'add',
+    group: true,
+    admin: true,
+    run: async (ctx, args) => {
+      const { sock, msg, jid } = ctx;
+      const nums = parseNumbers(args.join(' ')).filter((n) => n.length >= 7);
+      if (!nums.length) return replyText(sock, msg, 'Usage: !add 919876543210,919876543211');
+      try {
+        await sock.groupParticipantsUpdate(jid, nums.map(jidForNumber), 'add');
+        return replyText(sock, msg, `Added ${nums.length} member(s).`);
+      } catch (e) {
+        return replyText(sock, msg, `Add failed: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'promote',
+    aliases: ['admin'],
+    group: true,
+    admin: true,
+    run: async (ctx, args) => {
+      const { sock, msg, jid } = ctx;
+      const targets = targetJids(ctx);
+      if (!targets.length) return replyText(sock, msg, 'Mention the member to promote.');
+      try {
+        await sock.groupParticipantsUpdate(jid, targets, 'promote');
+        return replyText(sock, msg, `Promoted ${targets.length} member(s).`);
+      } catch (e) {
+        return replyText(sock, msg, `Promote failed: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'demote',
+    aliases: ['unadmin'],
+    group: true,
+    admin: true,
+    run: async (ctx, args) => {
+      const { sock, msg, jid } = ctx;
+      const targets = targetJids(ctx);
+      if (!targets.length) return replyText(sock, msg, 'Mention the member to demote.');
+      try {
+        await sock.groupParticipantsUpdate(jid, targets, 'demote');
+        return replyText(sock, msg, `Demoted ${targets.length} member(s).`);
+      } catch (e) {
+        return replyText(sock, msg, `Demote failed: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'mute',
+    aliases: ['lock'],
+    group: true,
+    admin: true,
+    run: async (ctx, args) => {
+      const { sock, msg, jid } = ctx;
+      try {
+        await sock.groupSettingUpdate(jid, 'announcement');
+        return replyText(sock, msg, 'Group muted. Only admins can chat now.');
+      } catch (e) {
+        return replyText(sock, msg, `Mute failed: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'unmute',
+    aliases: ['unlock'],
+    group: true,
+    admin: true,
+    run: async (ctx, args) => {
+      const { sock, msg, jid } = ctx;
+      try {
+        await sock.groupSettingUpdate(jid, 'not_announcement');
+        return replyText(sock, msg, 'Group unmuted. Everyone can chat again.');
+      } catch (e) {
+        return replyText(sock, msg, `Unmute failed: ${e.message}`);
+      }
+    },
+  },
+  {
+    name: 'welcome',
+    group: true,
+    admin: true,
+    run: async (ctx, args) => {
+      const { sock, msg, jid } = ctx;
+      const group = getGroup(jid);
+      const sub = (args[0] || '').toLowerCase();
+      if (sub === 'on' || sub === 'enable') {
+        group.welcome = 'on';
+        group.goodbye = 'on';
+        saveGroup(jid, group);
+        return replyText(sock, msg, 'Welcome/goodbye messages enabled.');
+      }
+      if (sub === 'off' || sub === 'disable') {
+        group.welcome = 'off';
+        group.goodbye = 'off';
+        saveGroup(jid, group);
+        return replyText(sock, msg, 'Welcome/goodbye messages disabled.');
+      }
+      if (sub === 'set' || sub === 'msg') {
+        const text = args.slice(1).join(' ').trim();
+        if (!text) return replyText(sock, msg, 'Usage: !welcome set <message>, use {name} for the member.');
+        group.welcomeMsg = text;
+        saveGroup(jid, group);
+        return replyText(sock, msg, `Welcome message set:\n\n${text}`);
+      }
+      return replyText(sock, msg, 'Usage: !welcome on | off | set <message>');
+    },
+  },
+  {
+    name: 'warn',
+    aliases: ['vwarn'],
+    group: true,
+    admin: true,
+    run: async (ctx, args) => {
+      const { sock, msg, jid } = ctx;
+      const sender = ctx.quotedSender || getMentionedJids(msg)?.[0];
+      if (!sender) return replyText(sock, msg, 'Reply to a message or mention the user to warn.');
+      const key = `${jid}:${getCleanUserNumber(sender)}`;
+      const warns = addWarn(key);
+      if (warns >= config.maxWarns) {
+        setWarns(key, 0);
+        try {
+          await sock.groupParticipantsUpdate(jid, [sender], 'remove');
+          return replyText(sock, msg, `⚠️ Warning limit reached. Removed ${getCleanUserNumber(sender)}.`);
+        } catch {
+          return replyText(sock, msg, `⚠️ Warning limit reached but I could not kick the user.`);
+        }
+      }
+      return replyText(sock, msg, `⚠️ ${getCleanUserNumber(sender)} warned (${warns}/${config.maxWarns}).`);
+    },
+  },
+  {
+    name: 'warns',
+    group: true,
+    admin: true,
+    run: async (ctx, args) => {
+      const { sock, msg, jid } = ctx;
+      const sender = ctx.quotedSender || getMentionedJids(msg)?.[0];
+      if (!sender) return replyText(sock, msg, 'Mention the user to check warns.');
+      const key = `${jid}:${getCleanUserNumber(sender)}`;
+      return replyText(sock, msg, `${getCleanUserNumber(sender)} has ${getWarns(key)}/${config.maxWarns} warns.`);
+    },
+  },
+  {
+    name: 'resetwarns',
+    aliases: ['clearwarns'],
+    group: true,
+    admin: true,
+    run: async (ctx, args) => {
+      const { sock, msg, jid } = ctx;
+      const sender = ctx.quotedSender || getMentionedJids(msg)?.[0];
+      if (!sender) return replyText(sock, msg, 'Mention the user to clear warns.');
+      resetWarns(`${jid}:${getCleanUserNumber(sender)}`);
+      return replyText(sock, msg, `Cleared warns for ${getCleanUserNumber(sender)}.`);
+    },
+  },
+];
