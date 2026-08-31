@@ -6,6 +6,7 @@ import {
 } from '@whiskeysockets/baileys';
 import pino from 'pino';
 import { config } from '../config.js';
+import { resolveUserJid } from './lidmap.js';
 
 const logger = pino({ level: 'silent' });
 
@@ -60,8 +61,43 @@ export function typeHasMedia(type) {
   return mediaTypes.has(type);
 }
 
-export async function downloadMedia(msg) {
-  return downloadMediaMessage(msg, 'buffer', {}, { logger, rethrowRequest: true, logDownloading: true });
+function mediaHasUrl(msg) {
+  const { content } = getContent(msg) || {};
+  if (!content) return false;
+  for (const k of Object.keys(content)) {
+    const m = content[k];
+    if (m && typeof m === 'object' && (m.url || m.directPath)) return true;
+  }
+  return false;
+}
+
+export async function downloadMedia(msg, sock) {
+  if (!mediaHasUrl(msg) && sock?.updateMediaMessage && msg?.message) {
+    try {
+      await Promise.race([
+        sock.updateMediaMessage(msg),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('updateMediaMessage timed out')), 12000)),
+      ]);
+    } catch {}
+  }
+  let lastErr;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await downloadMediaMessage(msg, 'buffer', {}, {
+        logger,
+        rethrowRequest: true,
+        logDownloading: true,
+        reuploadRequest: async (m) => {
+          if (sock?.updateMediaMessage) return sock.updateMediaMessage(m);
+          throw new Error('no sock available to refresh media');
+        },
+      });
+    } catch (e) {
+      lastErr = e;
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 800 * attempt));
+    }
+  }
+  throw lastErr;
 }
 
 export async function replyText(sock, msg, text, options = {}) {
@@ -100,8 +136,9 @@ export async function isGroupAdmin(sock, groupJid, participantJid) {
 }
 
 export function isOwner(senderJid) {
-  const sender = getCleanUserNumber(senderJid);
-  return config.owner.some((o) => o === sender || sender.endsWith(o));
+  const resolved = getCleanUserNumber(resolveUserJid(senderJid));
+  const raw = getCleanUserNumber(senderJid);
+  return config.owner.some((o) => o === resolved || o === raw || resolved.endsWith(o) || raw.endsWith(o));
 }
 
 export function normalizeJid(jid = '') {

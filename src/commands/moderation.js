@@ -5,29 +5,43 @@ import {
   getCleanUserNumber,
   parseNumbers,
 } from '../helpers.js';
+import { resolveGroupUser } from '../lidmap.js';
 import { getGroup, saveGroup, getWarns, setWarns, addWarn, resetWarns } from '../state.js';
 
 const jidForNumber = (n) => `${n}@s.whatsapp.net`;
 
-function targetJids(ctx) {
-  const { msg } = ctx;
+async function targetJids(ctx) {
+  const { sock, msg, jid } = ctx;
   const mentioned = getMentionedJids(msg) || [];
   const quoted = ctx.quotedSender || null;
   const nums = parseNumbers(ctx.argsText || '');
   const fromNums = nums.filter((n) => n.length >= 7).map((n) => jidForNumber(n));
   const set = new Set([...mentioned, ...(quoted ? [quoted] : []), ...fromNums]);
-  return [...set].filter(Boolean);
+  const raw = [...set].filter(Boolean);
+  const resolved = [];
+  for (const j of raw) {
+    const r = await resolveGroupUser(sock, jid, j);
+    if (r && !resolved.includes(r)) resolved.push(r);
+  }
+  return resolved;
+}
+
+async function targetSender(ctx) {
+  const { sock, msg, jid } = ctx;
+  const raw = ctx.quotedSender || getMentionedJids(msg)?.[0];
+  if (!raw) return null;
+  return resolveGroupUser(sock, jid, raw);
 }
 
 export default [
   {
     name: 'kick',
-    aliases: ['remove', 'rm'],
+    aliases: ['remove', 'rm', 'ban'],
     group: true,
     admin: true,
     run: async (ctx, args) => {
       const { sock, msg, jid } = ctx;
-      const targets = targetJids(ctx);
+      const targets = await targetJids(ctx);
       if (!targets.length) return replyText(sock, msg, 'Mention or list the members to kick.');
       try {
         await sock.groupParticipantsUpdate(jid, targets, 'remove');
@@ -60,7 +74,7 @@ export default [
     admin: true,
     run: async (ctx, args) => {
       const { sock, msg, jid } = ctx;
-      const targets = targetJids(ctx);
+      const targets = await targetJids(ctx);
       if (!targets.length) return replyText(sock, msg, 'Mention the member to promote.');
       try {
         await sock.groupParticipantsUpdate(jid, targets, 'promote');
@@ -77,7 +91,7 @@ export default [
     admin: true,
     run: async (ctx, args) => {
       const { sock, msg, jid } = ctx;
-      const targets = targetJids(ctx);
+      const targets = await targetJids(ctx);
       if (!targets.length) return replyText(sock, msg, 'Mention the member to demote.');
       try {
         await sock.groupParticipantsUpdate(jid, targets, 'demote');
@@ -154,7 +168,7 @@ export default [
     admin: true,
     run: async (ctx, args) => {
       const { sock, msg, jid } = ctx;
-      const sender = ctx.quotedSender || getMentionedJids(msg)?.[0];
+      const sender = await targetSender(ctx);
       if (!sender) return replyText(sock, msg, 'Reply to a message or mention the user to warn.');
       const key = `${jid}:${getCleanUserNumber(sender)}`;
       const warns = addWarn(key);
@@ -176,7 +190,7 @@ export default [
     admin: true,
     run: async (ctx, args) => {
       const { sock, msg, jid } = ctx;
-      const sender = ctx.quotedSender || getMentionedJids(msg)?.[0];
+      const sender = await targetSender(ctx);
       if (!sender) return replyText(sock, msg, 'Mention the user to check warns.');
       const key = `${jid}:${getCleanUserNumber(sender)}`;
       return replyText(sock, msg, `${getCleanUserNumber(sender)} has ${getWarns(key)}/${config.maxWarns} warns.`);
@@ -189,7 +203,7 @@ export default [
     admin: true,
     run: async (ctx, args) => {
       const { sock, msg, jid } = ctx;
-      const sender = ctx.quotedSender || getMentionedJids(msg)?.[0];
+      const sender = await targetSender(ctx);
       if (!sender) return replyText(sock, msg, 'Mention the user to clear warns.');
       resetWarns(`${jid}:${getCleanUserNumber(sender)}`);
       return replyText(sock, msg, `Cleared warns for ${getCleanUserNumber(sender)}.`);

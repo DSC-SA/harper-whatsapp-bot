@@ -1,36 +1,102 @@
+import { getVars } from './src/vars.js';
+
 const str = (v, d) => (v === undefined || v === null || v === '' ? d : String(v));
 const num = (v, d) => {
   const n = Number(v);
   return Number.isFinite(n) ? n : d;
 };
 
-export const config = {
-  prefix: str(process.env.PREFIX, '!'),
-  botName: str(process.env.BOT_NAME, 'Harper'),
-  owner: (process.env.OWNER || '')
-    .split(',')
-    .map((s) => s.trim().replace(/[^0-9]/g, ''))
-    .filter(Boolean),
+const vars = getVars();
 
-  stickerPack: str(process.env.STICKER_PACK, 'DawnSphereCommunity'),
-  stickerAuthor: str(process.env.STICKER_AUTHOR, 'Harper'),
-  watermark: str(process.env.WATERMARK, 'DawnSphereCommunity'),
+const resolve = (key, d) => {
+  const fromVars = str(vars[key], null);
+  if (fromVars !== null) return fromVars;
+  const fromEnv = str(process.env[key], null);
+  return fromEnv === null ? d : fromEnv;
+};
+
+export const config = {
+  get prefix() {
+    return resolve('PREFIX', '/');
+  },
+  get botName() {
+    return resolve('BOT_NAME', 'Harper');
+  },
+  get owner() {
+    const src = [
+      vars.SUDO ?? process.env.SUDO ?? '',
+      vars.OWNER ?? process.env.OWNER ?? '',
+    ].join(' ');
+    return src
+      .split(/[,\s]+/)
+      .map((s) => s.trim().replace(/[^0-9]/g, ''))
+      .filter(Boolean);
+  },
+
+  get stickerPack() {
+    return resolve('STICKER_PACK', 'DawnSphereCommunity');
+  },
+  get stickerAuthor() {
+    return resolve('STICKER_AUTHOR', 'Harper');
+  },
+  get watermark() {
+    return resolve('WATERMARK', 'DawnSphereCommunity');
+  },
+  get stickerExif() {
+    const v = process.env.STICKER_EXIF;
+    return v === undefined || v === null ? true : String(v).toLowerCase() !== '0' && String(v).toLowerCase() !== 'false';
+  },
 
   sessionId: str(process.env.SESSION_ID, ''),
   sessionDir: str(process.env.SESSION_DIR, 'session'),
+  qrFile: str(process.env.HARPER_QR_FILE, 'data/qr.png'),
+  pairFor: str(process.env.PAIRING_CODE_FOR, ''),
 
-  appUrl: str(process.env.HARPER_APP_URL || process.env.PUBLIC_URL, ''),
-  port: num(process.env.PORT, 3000),
-  keepAliveMinutes: num(process.env.KEEP_ALIVE_MIN, 40),
+  get appUrl() {
+    return resolve('HARPER_APP_URL', '') || resolve('PUBLIC_URL', '');
+  },
+  get port() {
+    return num(resolve('PORT', '3000'), 3000);
+  },
+  get keepAliveMinutes() {
+    return num(resolve('KEEP_ALIVE_MIN', '40'), 40);
+  },
 
-  antilinkDefault: str(process.env.DEFAULT_ANTILINK, 'off'),
-  antilinkAction: str(process.env.ANTILINK_ACTION, 'warn'),
+  get antilinkDefault() {
+    return resolve('DEFAULT_ANTILINK', 'off');
+  },
+  get antilinkAction() {
+    return resolve('ANTILINK_ACTION', 'warn');
+  },
 
-  floodLimit: num(process.env.FLOOD_LIMIT, 6),
-  floodWindow: num(process.env.FLOOD_WINDOW, 15),
-  spamAction: str(process.env.SPAM_ACTION, 'mute'),
-  spamMuteMinutes: num(process.env.SPAM_MUTE_MIN, 30),
+  get floodLimit() {
+    return num(resolve('FLOOD_LIMIT', '6'), 6);
+  },
+  get floodWindow() {
+    return num(resolve('FLOOD_WINDOW', '15'), 15);
+  },
+  get spamAction() {
+    return resolve('SPAM_ACTION', 'mute');
+  },
+  get spamMuteMinutes() {
+    return num(resolve('SPAM_MUTE_MIN', '30'), 30);
+  },
 
-  maxWarns: num(process.env.MAX_WARNS, 3),
-  warnMuteMinutes: num(process.env.WARN_MUTE_MIN, 30),
+  get maxWarns() {
+    return num(resolve('MAX_WARNS', '3'), 3);
+  },
+  get warnMuteMinutes() {
+    return num(resolve('WARN_MUTE_MIN', '30'), 30);
+  },
+
+  get mlbbRegGroup() {
+    return resolve('MLBB_REG_GROUP', '120363404307438604@g.us');
+  },
+
+  get mlbbRegGroups() {
+    return String(resolve('MLBB_REG_GROUP', '120363404307438604@g.us,120363423706976066@g.us'))
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  },
 };

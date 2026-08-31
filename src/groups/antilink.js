@@ -49,7 +49,7 @@ export default [
         saveGroup(jid, group);
         return replyText(sock, msg, 'Anti-link OFF.');
       }
-      return replyText(sock, msg, 'Usage: !antilink on | off');
+      return replyText(sock, msg, `Usage: ${config.prefix}antilink on | off`);
     },
   },
   {

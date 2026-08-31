@@ -13,9 +13,16 @@ export function startServer() {
 
   app.get('/', (req, res) => res.send(`${config.botName} is running.`));
 
-  return app.listen(config.port, '0.0.0.0', () => {
+  const server = app.listen(config.port, '0.0.0.0', () => {
     console.log(`[harper] http server listening on :${config.port}`);
   });
+  server.on('clientError', (_err, socket) => {
+    if (socket) socket.destroy();
+  });
+  server.on('connection', (socket) => {
+    socket.on('error', () => {});
+  });
+  return server;
 }
 
 export function startKeepAlive() {

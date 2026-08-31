@@ -13,34 +13,34 @@ Built from scratch on the official [`@whiskeysockets/baileys`](https://www.npmjs
 ### Stickers (all watermarked *DawnSphereCommunity*)
 | Command | What it does |
 |---|---|
-| `!sticker` | Reply to an image / video / GIF → 512×512 watermarked WebP sticker |
-| `!attp <text>` | Colored text sticker |
-| `!toimg` | Reply to a sticker → image |
-| `!stickerinfo` | Sticker pack info |
-| `!emoji <emoji>` | Emoji → sticker |
+| `/sticker` | Reply to an image / video / GIF → 512×512 watermarked WebP sticker |
+| `/attp <text>` | Colored text sticker |
+| `/toimg` | Reply to a sticker → image |
+| `/stickerinfo` | Sticker pack info |
+| `/emoji <emoji>` | Emoji → sticker |
 
 Sticker pack name: **DawnSphereCommunity** · author: **Harper**
 
 ### Group moderation (group admins)
-`!kick` `!add <numbers>` `!promote` `!demote` `!mute` `!unmute` `!warn` `!warns` `!resetwarns` `!welcome on|off|set <msg>`
+`/kick` `/add <numbers>` `/promote` `/demote` `/mute` `/unmute` `/warn` `/warns` `/resetwarns` `/welcome on|off|set <msg>`
 
 ### Protection
 | Command | What it does |
 |---|---|
-| `!antilink on\|off` | Blocks links (per `ANTILINK_ACTION`) |
-| `!allowlink <domain>` / `!blocklink <domain>` | Per-group domain control |
-| `!antispam on\|off` | Flood guard (N msgs / T seconds → action) |
-| `!antibad on\|off` · `!word add\|remove <word>` | Bad-word filter (deletes + warns) |
-| `!automute on <HH:MM> <HH:MM>` · `!automute off` | Scheduled group mute/unmute, survives restarts |
+| `/antilink on\|off` | Blocks links (per `ANTILINK_ACTION`) |
+| `/allowlink <domain>` / `/blocklink <domain>` | Per-group domain control |
+| `/antispam on\|off` | Flood guard (N msgs / T seconds → action) |
+| `/antibad on\|off` · `/word add\|remove <word>` | Bad-word filter (deletes + warns) |
+| `/automute on <HH:MM> <HH:MM>` · `/automute off` | Scheduled group mute/unmute, survives restarts |
 
 ### MLBB (Mobile Legends registration)
 | Command | What it does |
 |---|---|
-| `!mlbbreg` | Register your MLBB account (DM only) — Role ID / Zone ID / in-game verification code |
-| `!mlbbpf` | Your MLBB profile card with live rank/stats + avatar |
+| `/mlbbreg` | Register your MLBB account (DM only) — Role ID / Zone ID / in-game verification code |
+| `/mlbbpf` | Your MLBB profile card with live rank/stats + avatar |
 
 ### Utilities & admin
-`!menu` `!help <cmd>` `!ping` `!alive` `!afk [reason]` · owner-only: `!pair <number>` `!mysession`
+`/menu` `/help <cmd>` `/ping` `/alive` `/afk [reason]` · owner-only: `/pair <number>` `/mysession`
 
 ---
 
@@ -81,10 +81,10 @@ A **QR code** prints in the terminal. On your phone:
 Once connected you'll see `[harper] connected as …`.
 
 ### Alternative: pairing code (no QR)
-DM your bot `!pair <phonenumber>` and enter the 8-char code under *Link a Device → Link with phone number instead*.
+DM your bot `/pair <phonenumber>` and enter the 8-char code under *Link a Device → Link with phone number instead*.
 
 ### Get the session string (for Koyeb)
-DM the bot `!mysession`. It replies with a long base64 string — that's your **SESSION_ID**. Keep it private.
+DM the bot `/mysession`. It replies with a long base64 string — that's your **SESSION_ID**. Keep it private.
 
 ---
 
@@ -106,12 +106,12 @@ gh repo create Harper --public --source . --push   # or create manually on githu
 1. Create the service from your GitHub repo (`New Service → GitHub Repository → Harper`).
 2. Choose build type **Docker** (uses the included `Dockerfile` with ffmpeg).
 3. Set environment variables:
-   - `SESSION_ID` — your `!mysession` string (this is how the bot survives restarts)
+   - `SESSION_ID` — your `/mysession` string (this is how the bot survives restarts)
    - `OWNER` — e.g. `919876543210`
    - `HARPER_APP_URL` — `https://<your-app>.koyeb.app`
    - `PREFIX`, `STICKER_PACK`, `WATERMARK` … (optional)
 4. Health check path: `/health`, port: `3000` (Koyeb injects `PORT`).
-5. Deploy. No terminal there, so pair by DM (`!pair`) if paired locally isn't possible, then re-pair and update `SESSION_ID`.
+5. Deploy. No terminal there, so pair by DM (`/pair`) if paired locally isn't possible, then re-pair and update `SESSION_ID`.
 
 ### Keeping it alive on the free tier
 Koyeb free instances **scale to zero after 1 hour of no traffic** — that would sever your bot. Harper:
@@ -128,7 +128,7 @@ Optional belt-and-braces: add a free uptime monitor (UptimeRobot / cron-job.org)
 
 | Var | Default | Notes |
 |---|---|---|
-| `PREFIX` | `!` | command prefix |
+| `PREFIX` | `/` | command prefix |
 | `OWNER` | – | your number(s), comma-separated |
 | `SESSION_ID` | – | base64 session (Koyeb) |
 | `SESSION_DIR` | `session` | local session folder |

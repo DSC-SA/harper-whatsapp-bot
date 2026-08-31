@@ -1,12 +1,17 @@
-import makeWASocket, {
+import {
+  makeWASocket,
   DisconnectReason,
   makeCacheableSignalKeyStore,
   fetchLatestBaileysVersion,
 } from '@whiskeysockets/baileys';
 import qrcodeTerminal from 'qrcode-terminal';
+import QRCode from 'qrcode';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import pino from 'pino';
 import { buildAuthState } from './session.js';
 import { config } from '../config.js';
+import { recordLidMapping, recordKeyMappings, recordGroupMappings } from './lidmap.js';
 
 const logger = pino({ level: (process.env.LOG_LEVEL || 'warn'), name: 'harper' });
 
@@ -15,6 +20,17 @@ function showQr(qr) {
     console.log('[harper] Scan this QR in WhatsApp > Linked Devices to pair:');
     console.log(out);
   });
+  QRCode.toFile(config.qrFile, qr, { width: 640, margin: 2 })
+    .then(() => console.log(`[harper] QR image saved: ${config.qrFile} (refreshes until scanned)`))
+    .catch(async (e) => {
+      try {
+        mkdirSync(dirname(config.qrFile), { recursive: true });
+        await QRCode.toFile(config.qrFile, qr, { width: 640, margin: 2 });
+        console.log(`[harper] QR image saved: ${config.qrFile} (refreshes until scanned)`);
+      } catch (e2) {
+        console.log(`[harper] failed to write QR image: ${e2.message}`);
+      }
+    });
 }
 
 async function makeSock(authState) {
@@ -36,6 +52,38 @@ export async function startClient(handlers) {
   let sock = null;
   let authState = null;
   let reconnectTimer = null;
+  let pairCodeRequested = false;
+
+  async function requestPairCode() {
+    if (!config.pairFor || authState.state.creds.registered) return;
+    if (pairCodeRequested) return;
+    pairCodeRequested = true;
+    const wsOpen = () => sock?.ws && sock.ws.readyState === 1;
+    let attempts = 0;
+    const tryOnce = async () => {
+      if (!wsOpen()) {
+        if (attempts < 20) setTimeout(tryOnce, 3000);
+        return;
+      }
+      try {
+        const code = await sock.requestPairingCode(config.pairFor);
+        const msg = `[harper] PAIRING CODE for ${config.pairFor}: ${code}  (WhatsApp > Link a Device > Link with phone number instead)`;
+        console.log(msg);
+        try {
+          mkdirSync(dirname(config.qrFile), { recursive: true });
+          writeFileSync('data/pairing_code.txt', code, 'utf8');
+        } catch {}
+      } catch (e) {
+        attempts += 1;
+        if (attempts < 15) setTimeout(tryOnce, 8000);
+        else {
+          console.log(`[harper] giving up on pairing code after ${attempts} attempts`);
+          pairCodeRequested = false;
+        }
+      }
+    };
+    await tryOnce();
+  }
 
   const connect = async () => {
     try {
@@ -45,6 +93,8 @@ export async function startClient(handlers) {
     }
 
     sock = await makeSock(authState);
+
+    await requestPairCode();
 
     sock.ev.on('creds.update', authState.saveCreds);
 
@@ -59,10 +109,11 @@ export async function startClient(handlers) {
 
       if (connection === 'close') {
         const code = lastDisconnect?.error?.output?.statusCode;
-        const loggedOut = code === DisconnectReason.loggedOut;
-        console.log(`[harper] connection closed (code=${code})`);
+        const registered = !!(authState?.state?.creds?.registered);
+        const errMsg = lastDisconnect?.error?.message || '';
+        console.log(`[harper] connection closed (code=${code}, registered=${registered})${errMsg ? ` :: ${errMsg}` : ''}`);
 
-        if (loggedOut) {
+        if (code === DisconnectReason.loggedOut && registered) {
           console.log('[harper] logged out. clear SESSION_ID and re-pair.');
           return;
         }
@@ -76,7 +127,9 @@ export async function startClient(handlers) {
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       try {
         for (const msg of messages) {
-          if (msg.key && msg.key.fromMe) continue;
+          if (!msg?.key) continue;
+          recordKeyMappings(msg.key);
+          if (msg.key.fromMe) continue;
           if (type !== 'notify') continue;
           await handlers?.onMessage?.(sock, msg);
         }
@@ -85,9 +138,30 @@ export async function startClient(handlers) {
       }
     });
 
+    sock.ev.on('contacts.update', (contacts) => {
+      try {
+        for (const c of contacts || []) {
+          if (!c?.lid) continue;
+          if (c.phoneNumber) recordLidMapping(c.lid, `${c.phoneNumber}@s.whatsapp.net`);
+          else if (c.id && !String(c.id).endsWith('@lid')) recordLidMapping(c.lid, c.id);
+        }
+      } catch (e) {
+        console.log(`[harper] contacts handler error: ${e.message}`);
+      }
+    });
+
+    sock.ev.on('chats.phoneNumberShare', ({ lid, jid }) => {
+      try {
+        if (lid && jid) recordLidMapping(lid, jid);
+      } catch (e) {
+        console.log(`[harper] number share handler error: ${e.message}`);
+      }
+    });
+
     sock.ev.on('group-participants.update', (update) => {
       try {
         handlers?.onParticipants?.(sock, update);
+        if (update?.id) recordGroupMappings(sock, update.id).catch(() => {});
       } catch (e) {
         console.log(`[harper] participants handler error: ${e.message}`);
       }

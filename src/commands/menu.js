@@ -1,3 +1,5 @@
+import { config } from '../../config.js';
+
 export default [
   {
     name: 'menu',
@@ -11,68 +13,94 @@ export default [
   },
 ];
 
+const P = () => config.prefix;
+
 const HELP = {
-  main: `*DawnSphereCommunity* · Harper
-A Baileys-powered WhatsApp bot.
-Prefix: *
-All stickers carry the DawnSphereCommunity watermark.
+  main: `╭━ *${config.botName}* · ${config.watermark}
+▸ Command prefix: *${config.prefix}*
 
-*MEDIA*
-*!sticker* — reply to image/video/GIF
-*!attp <text>* — colored text sticker
-*!toimg* — reply to a sticker → image
-*!stickerinfo* — reply to a sticker → pack info
+┌─ ✧ MEDIA ✧ ─
+│ ${P()}sticker · ${P()}toimg · ${P()}attp
+│ ${P()}stickerinfo
+└─────────────
 
-*GROUP ADMINS*
-*!kick* · *!add* · *!promote* · *!demote* · *!mute* · *!unmute*
-*!welcome on|off* + *!welcome set <msg>*
-*!warn* · *!warns @user* · *!resetwarns*
+┌─ ✧ MODERATION ─ ✧
+│ ${P()}kick · ${P()}add · ${P()}promote
+│ ${P()}demote · ${P()}mute · ${P()}unmute
+│ ${P()}warn · ${P()}warns · ${P()}resetwarns
+│ ${P()}welcome
+└─────────────
 
-*PROTECTION*
-*!antilink on|off* · *!allowlink/!blocklink <domain>*
-*!antispam on|off*
-*!antibad on|off* · *!word add|remove <word>*
-*!automute on <HH:MM> <HH:MM>* · *!automute off*
+┌─ ✧ PROTECTION ─ ✧
+│ ${P()}antilink ┐  ${P()}allowlink
+│ ${P()}blocklink ┘  ${P()}antispam
+│ ${P()}antibad · ${P()}word
+│ ${P()}automute
+└─────────────
 
-*MLBB*
-*!mlbbreg* — register (DM only) · *!mlbbpf* — profile card
+┌─ ✧ MLBB ─ ✧
+│ ${P()}mlbbreg (DM) · ${P()}mlbbpf
+└─────────────
 
-*UTILITIES*
-*!menu* · *!ping* · *!alive* · *!afk [reason]*
+┌─ ✧ UTILITIES ─ ✧
+│ ${P()}ping · ${P()}alive · ${P()}afk
+│ ${P()}menu
+└─────────────
 
-Type *!help <command>* for details.`,
+┌─ ✧ OWNER ─ ✧
+│ ${P()}setvar · ${P()}reboot
+│ ${P()}zushi · ${P()}tushi · ${P()}ope · ${P()}levels
+│ ${P()}mysession · ${P()}pair
+└─────────────
 
-  sticker: `*!sticker* — reply to an image, video or GIF. Creates a 512x512 WebP sticker with the DawnSphereCommunity watermark.
-Usage: *!sticker*`,
-  attp: `*!attp <text>* — creates a colored text sticker. Keep text short.
-Usage: *!attp DawnSphere*`,
-  toimg: `*!toimg* — reply to a sticker to convert it back to an image.`,
-  stickerinfo: `*!stickerinfo* — reply to a sticker to see its pack info.`,
-  kick: `*!kick* — removes members. Mention them or list numbers.
-Usage: *!kick @user*`,
-  add: `*!add <number[,number]>* — adds members by number.
-Usage: *!add 919876543210,919876543211*`,
-  promote: `*!promote @user* — makes a member an admin.`,
-  demote: `*!demote @user* — removes admin rights.`,
-  mute: `*!mute* — locks the group so only admins can chat.`,
-  unmute: `*!unmute* — reopens the group.`,
-  welcome: `*!welcome on|off* — welcome/goodbye notices.
-*!welcome set <msg>* — customize (use {name} for the member).
-Usage: *!welcome on*`,
-  warn: `*!warn @user|reply* — adds a warning; after MAX_WARNS the user is kicked.
-*!warns @user* — show count. *!resetwarns @user* — clear.`,
-  antilink: `*!antilink on|off* — blocks links per ANTILINK_ACTION (warn/kick/mute).
-*!allowlink <domain>* — whitelist. *!blocklink <domain>* — blacklist.
-Usage: *!antilink on*`,
-  antispam: `*!antispam on|off* — flood guard: N msgs in T seconds triggers SPAM_ACTION.
-Usage: *!antispam on*`,
-  antibad: `*!antibad on|off* — deletes messages with bad words.
-*!word add <word>* / *!word remove <word>* — manage the list.`,
-  automute: `*!automute on <start HH:MM> <end HH:MM>* — daily mute window (announcement mode). Survives restarts.
-Usage: *!automute on 22:00 07:00* · *!automute off*`,
-  afk: `*!afk [reason]* — marks you away. Harper notifies anyone who mentions you. Send any message to clear.`,
-  ping: `*!ping* — latency check.`,
-  alive: `*!alive* — bot status + uptime.`,
-  mlbbreg: `*!mlbbreg* — starts MLBB registration (DM only). You'll give your Role ID, Zone ID and a verification code from your in-game mail.`,
-  mlbbpf: `*!mlbbpf* — generates your MLBB profile card with current stats.`,
+▸ *${P()}help <command>* for details.
+╰══ ${config.watermark} ══`,
+
+  sticker: `*${P()}sticker* — reply to an image, video or GIF → 512×512 WebP sticker with the ${config.watermark} watermark.
+Usage: ${P()}sticker`,
+  attp: `*${P()}attp <text>* — colored text sticker. Keep it short.
+Usage: ${P()}attp DawnSphere`,
+  toimg: `*${P()}toimg* — reply to a sticker to convert it back to an image.`,
+  stickerinfo: `*${P()}stickerinfo* — reply to a sticker to see its pack info.`,
+  kick: `*${P()}kick* — removes members. Mention them or list numbers.
+Usage: ${P()}kick @user`,
+  add: `*${P()}add <number[,number]>* — adds members by number.
+Usage: ${P()}add 919876543210,919876543211`,
+  promote: `*${P()}promote @user* — makes a member an admin.`,
+  demote: `*${P()}demote @user* — removes admin rights.`,
+  mute: `*${P()}mute* — locks the group so only admins can chat.`,
+  unmute: `*${P()}unmute* — reopens the group.`,
+  welcome: `*${P()}welcome on|off* — welcome/goodbye notices.
+*${P()}welcome set <msg>* — customize (use {name} for the member).
+Usage: ${P()}welcome on`,
+  warn: `*${P()}warn @user|reply* — adds a warning; after MAX_WARNS the user is kicked.
+*${P()}warns @user* — show count. *${P()}resetwarns @user* — clear.`,
+  antilink: `*${P()}antilink on|off* — blocks links per ANTILINK_ACTION (warn/kick/mute).
+*${P()}allowlink <domain>* — whitelist. *${P()}blocklink <domain>* — blacklist.
+Usage: ${P()}antilink on`,
+  antispam: `*${P()}antispam on|off* — flood guard: N msgs in T seconds triggers SPAM_ACTION.
+Usage: ${P()}antispam on`,
+  antibad: `*${P()}antibad on|off* — reacts to bad words.
+*${P()}word add <word>* / *${P()}word remove <word>* — manage the list.`,
+  automute: `*${P()}automute on <start HH:MM> <end HH:MM>* — daily mute window. Survives restarts.
+Usage: ${P()}automute on 22:00 07:00 · ${P()}automute off`,
+  afk: `*${P()}afk [reason]* — marks you away; Harper notifies anyone who mentions you. Send any message to clear.`,
+  ping: `*${P()}ping* — latency check. Access level is changeable with ${P()}zushi/tushi/ope.`,
+  alive: `*${P()}alive* — bot status + uptime.`,
+  mlbbreg: `*${P()}mlbbreg* — starts MLBB registration (DM only). You'll give a Role ID, Zone ID and a verification code from your in-game mail.`,
+  mlbbpf: `*${P()}mlbbpf* — generates your MLBB profile card with current stats.`,
+  setvar: `*${P()}setvar KEY=value* — sets a config var at runtime, instantly, and persists it.
+Aliases: ${P()}setvar=KEY=value · ${P()}var · ${P()}env
+Usage: ${P()}setvar SUDO=27812345678 · ${P()}setvar PREFIX=/
+List current: ${P()}setvar · Reset: ${P()}setvar KEY=`,
+  reboot: `*${P()}reboot* — restarts the bot process. Owner only.`,
+  zushi: `*${P()}zushi <command>* — makes a command public (anyone can use it).
+Usage: ${P()}zushi ping`,
+  tushi: `*${P()}tushi <command>* — makes a command admin-only.
+Usage: ${P()}tushi ping`,
+  ope: `*${P()}ope <command>* — locks a command to the owner only.
+Usage: ${P()}ope ping`,
+  levels: `*${P()}levels* — lists every command and its current access level. * = overridden.`,
+  mysession: `*${P()}mysession* — DM only. Returns your SESSION_ID (base64). Never share it.`,
+  pair: `*${P()}pair <number>* — DM only. Requests a pairing code for a phone number.`,
 };

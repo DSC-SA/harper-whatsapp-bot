@@ -1,7 +1,10 @@
-import { initAuthCreds, BufferJSON, proto } from '@whiskeysockets/baileys';
+import { initAuthCreds, BufferJSON } from '@whiskeysockets/baileys';
+import * as WAProto from '@whiskeysockets/baileys/WAProto/index.js';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { config } from '../config.js';
+
+const proto = WAProto.proto || WAProto.default?.proto;
 
 const STATE_FILE = join(config.sessionDir, 'state.json');
 
@@ -96,4 +99,21 @@ export async function buildAuthState() {
 
 export function clearSession() {
   sessionString = '';
+}
+
+export async function resetSignalSessions() {
+  const parsed = JSON.parse(await readFile(STATE_FILE, 'utf8'), BufferJSON.reviver);
+  if (!parsed?.creds) throw new Error('no creds in session state');
+  const keys = parsed.keys || {};
+  const removed = {
+    session: Object.keys(keys.session || {}).length,
+    'sender-key': Object.keys(keys['sender-key'] || {}).length,
+  };
+  delete keys.session;
+  delete keys['sender-key'];
+  parsed.keys = keys;
+  sessionString = encodeSessionString({ creds: parsed.creds, keys });
+  await mkdir(config.sessionDir, { recursive: true });
+  await writeFile(STATE_FILE, JSON.stringify({ creds: parsed.creds, keys }, BufferJSON.replacer), 'utf8');
+  return { removed, credsPreserved: true };
 }

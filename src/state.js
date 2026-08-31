@@ -38,6 +38,7 @@ export function getGroup(jid) {
       antibad: 'off',
       badWords: [],
       antispam: 'off',
+      antidoc: 'off',
       welcome: 'off',
       welcomeMsg: '',
       goodBye: 'off',

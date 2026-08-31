@@ -5,11 +5,13 @@ import {
   isGroupJid,
   getContent,
   isOwner as ownerCheck,
-  isGroupAdmin,
 } from './helpers.js';
+import { isGroupAdmin } from './admins.js';
 import { getGroup } from './state.js';
+import { getOverride } from './security.js';
 import { handleAfk } from './commands/afk.js';
 import { handleAntilink } from './groups/antilink.js';
+import { handleAntidoc } from './groups/antidoc.js';
 import { handleSpam, handleBadWord } from './groups/spamprotect.js';
 import menuCmd from './commands/menu.js';
 import aliveCmd from './commands/alive.js';
@@ -19,7 +21,10 @@ import afkCmd from './commands/afk.js';
 import ownerCmd from './commands/owner.js';
 import automuteCmd from './groups/automute.js';
 import antilinkCmd from './groups/antilink.js';
+import antidocCmd from './groups/antidoc.js';
 import spamCmd from './groups/spamprotect.js';
+import bansCmd from './groups/bans.js';
+import securityCmd from './commands/security.js';
 import mlbbCmd, { handlePendingMlbb } from './commands/mlbb.js';
 
 const commands = [
@@ -29,9 +34,12 @@ const commands = [
   ...moderationCmd,
   ...afkCmd,
   ...ownerCmd,
+  ...securityCmd,
   ...automuteCmd,
   ...antilinkCmd,
+  ...antidocCmd,
   ...spamCmd,
+  ...bansCmd,
   ...mlbbCmd,
 ];
 
@@ -67,10 +75,20 @@ function buildCtx(sock, msg) {
 }
 
 async function runWithChecks(ctx, cmd, args) {
-  if (cmd.owner && !ctx.isOwner) return { skipped: 'owner' };
+  const lvl = getOverride(cmd.name) || (cmd.owner ? 'owner' : cmd.admin ? 'admin' : 'public');
+  if (lvl === 'owner' && !ctx.isOwner) {
+    console.log(`[harper] owner-blocked: cmd=${cmd.name} sender=${ctx.sender} remote=${ctx.msg?.key?.remoteJid} fromMe=${ctx.msg?.key?.fromMe} sp=${ctx.msg?.key?.senderPn} pp=${ctx.msg?.key?.participantPn} sl=${ctx.msg?.key?.senderLid}`);
+    return { skipped: 'owner' };
+  }
+  if (lvl === 'admin') {
+    if (ctx.isGroup) {
+      if (!ctx.isAdmin) return { skipped: 'admin' };
+    } else if (!ctx.isOwner) {
+      return { skipped: 'owner' };
+    }
+  }
   if (cmd.group && !ctx.isGroup) return { skipped: 'group' };
   if (cmd.dmOnly && ctx.isGroup) return { skipped: 'dmonly' };
-  if (cmd.admin && ctx.isGroup && !ctx.isAdmin) return { skipped: 'admin' };
   const result = await cmd.run(ctx, args);
   return { result };
 }
@@ -101,6 +119,7 @@ export async function handleMessage(sock, msg) {
     await handleAntilink(ctx, msg);
     handleSpam(ctx);
     await handleBadWord(ctx);
+    await handleAntidoc(ctx, msg);
   }
 
   const afkNotice = await handleAfk(ctx);
@@ -108,15 +127,27 @@ export async function handleMessage(sock, msg) {
 
   if (!parsed) return { handled: false };
 
-  const cmd = byAlias.get(parsed.name);
+  let cmdName = parsed.name;
+  let cmdArgs = parsed.args;
+  const eq = cmdName.indexOf('=');
+  if (eq > 0) {
+    const head = cmdName.slice(0, eq).toLowerCase();
+    if (byAlias.has(head)) {
+      const glued = cmdName.slice(eq + 1).trim();
+      cmdArgs = glued ? [glued, ...cmdArgs] : cmdArgs;
+      cmdName = head;
+    }
+  }
+
+  const cmd = byAlias.get(cmdName);
   if (!cmd) {
     if (!ctx.isGroup) {
-      await ctx.sock.sendMessage(ctx.jid, { text: `Unknown command *${parsed.name}*. Try *${config.prefix}menu*.` }, { quoted: msg });
+      await ctx.sock.sendMessage(ctx.jid, { text: `Unknown command *${cmdName}*. Try *${config.prefix}menu*.` }, { quoted: msg });
     }
     return { handled: false };
   }
 
-  const out = await runWithChecks(ctx, cmd, parsed.args);
+  const out = await runWithChecks(ctx, cmd, cmdArgs);
   if (out.skipped) {
     await ctx.sock.sendMessage(ctx.jid, { text: SKIP_MSG[out.skipped] }, { quoted: msg });
   }
@@ -133,4 +164,8 @@ function getQuotedSenderFrom(msg) {
 
 export function getCommandList() {
   return commands;
+}
+
+export function findCommand(name) {
+  return byAlias.get(String(name).toLowerCase().replace(/^[^a-z0-9]+/, ''));
 }
