@@ -1,0 +1,13 @@
+node_modules
+npm-debug.log*
+session
+data
+*.log
+.env
+.DS_Store
+.git
+.gitignore
+.gitattributes
+_*.webp
+_*.mjs
+debug
