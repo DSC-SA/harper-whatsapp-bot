@@ -1,6 +1,7 @@
 import { config } from '../../config.js';
 import { getCleanUserNumber } from '../helpers.js';
 import { addWarn, setWarns } from '../state.js';
+import { kickBannedEverywhere } from './bans.js';
 
 export async function applyPolicy(sock, jid, sender, msg, reason, detail) {
   if (reason === 'spam' || reason === 'antilink' || reason === 'antidoc') {
@@ -22,7 +23,7 @@ export async function applyPolicy(sock, jid, sender, msg, reason, detail) {
 
     if (action === 'kick' || warns >= config.maxWarns) {
       setWarns(`${jid}:${getCleanUserNumber(sender)}`, 0);
-      await sock.groupParticipantsUpdate(jid, [sender], 'remove');
+      await kickBannedEverywhere(sock, [getCleanUserNumber(sender)]);
       return 'kicked';
     }
     if (action === 'mute') {

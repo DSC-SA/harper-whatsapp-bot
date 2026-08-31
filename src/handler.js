@@ -28,6 +28,7 @@ import securityCmd from './commands/security.js';
 import mlbbCmd, { handlePendingMlbb } from './commands/mlbb.js';
 import vvCmd from './commands/vv.js';
 import reregCmd from './commands/rereg.js';
+import chantCmd from './commands/chant.js';
 
 const commands = [
   ...menuCmd,
@@ -45,6 +46,7 @@ const commands = [
   ...mlbbCmd,
   ...vvCmd,
   ...reregCmd,
+  ...chantCmd,
 ];
 
 const byName = new Map();

@@ -6,6 +6,7 @@ import {
   parseNumbers,
 } from '../helpers.js';
 import { resolveGroupUser } from '../lidmap.js';
+import { kickBannedEverywhere } from '../groups/bans.js';
 import { getGroup, saveGroup, getWarns, setWarns, addWarn, resetWarns } from '../state.js';
 
 const jidForNumber = (n) => `${n}@s.whatsapp.net`;
@@ -175,8 +176,8 @@ export default [
       if (warns >= config.maxWarns) {
         setWarns(key, 0);
         try {
-          await sock.groupParticipantsUpdate(jid, [sender], 'remove');
-          return replyText(sock, msg, `⚠️ Warning limit reached. Removed ${getCleanUserNumber(sender)}.`);
+          const r = await kickBannedEverywhere(sock, [getCleanUserNumber(sender)]);
+          return replyText(sock, msg, `⚠️ Warning limit reached. ${getCleanUserNumber(sender)} removed from ${r.kicked} group(s).`);
         } catch {
           return replyText(sock, msg, `⚠️ Warning limit reached but I could not kick the user.`);
         }
@@ -207,6 +208,27 @@ export default [
       if (!sender) return replyText(sock, msg, 'Mention the user to clear warns.');
       resetWarns(`${jid}:${getCleanUserNumber(sender)}`);
       return replyText(sock, msg, `Cleared warns for ${getCleanUserNumber(sender)}.`);
+    },
+  },
+  {
+    name: 'unwarn',
+    aliases: ['removewarn', 'uwn'],
+    group: true,
+    admin: true,
+    run: async (ctx, args) => {
+      const { sock, msg, jid } = ctx;
+      const sender = await targetSender(ctx);
+      if (!sender) return replyText(sock, msg, 'Reply to a message or mention the user to unwarn.');
+      const key = `${jid}:${getCleanUserNumber(sender)}`;
+      const current = getWarns(key);
+      const all = (args[0] || '').toLowerCase() === 'all' || (args[0] || '').toLowerCase() === '-a';
+      if (all) {
+        resetWarns(key);
+        return replyText(sock, msg, `Cleared all warns for ${getCleanUserNumber(sender)}.`);
+      }
+      if (current <= 0) return replyText(sock, msg, `${getCleanUserNumber(sender)} has no warns.`);
+      setWarns(key, current - 1);
+      return replyText(sock, msg, `✓ Removed 1 warn from ${getCleanUserNumber(sender)} (${current - 1}/${config.maxWarns}).`);
     },
   },
 ];
