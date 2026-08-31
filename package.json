@@ -35,5 +35,8 @@
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
     "sharp": "^0.32.6"
+  },
+  "overrides": {
+    "libsignal": "https://codeload.github.com/whiskeysockets/libsignal-node/tar.gz/refs/heads/master"
   }
 }

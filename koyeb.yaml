@@ -1,0 +1,16 @@
+name: harper-whatsapp-bot
+service:
+  name: harper-whatsapp-bot
+  dockerfile: Dockerfile
+  ports:
+    - port: 3000
+      protocol: http
+  health_checks:
+    - port: 3000
+      type: tcp
+  scalings:
+    min: 1
+    max: 1
+  env:
+    - name: NODE_ENV
+      value: production
