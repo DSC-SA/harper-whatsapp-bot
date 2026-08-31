@@ -2,6 +2,7 @@ import { extractMessageContent } from '@whiskeysockets/baileys';
 import { replyText, getContent, isOwner } from '../helpers.js';
 import { config } from '../../config.js';
 import { getGroup, saveGroup } from '../state.js';
+import { applyPolicy } from './policies.js';
 
 export async function handleAntidoc(ctx) {
   const { sock, msg, jid, group, sender, isGroup } = ctx;
@@ -22,6 +23,8 @@ export async function handleAntidoc(ctx) {
   } catch (e) {
     console.log(`[harper] antidoc delete failed: ${e.message}`);
   }
+
+  await applyPolicy(sock, jid, sender, msg, 'antidoc', 'document');
 }
 
 export default [

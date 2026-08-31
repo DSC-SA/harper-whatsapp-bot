@@ -3,8 +3,8 @@ import { getCleanUserNumber } from '../helpers.js';
 import { addWarn, setWarns } from '../state.js';
 
 export async function applyPolicy(sock, jid, sender, msg, reason, detail) {
-  if (reason === 'spam' || reason === 'antilink') {
-    const action = reason === 'spam' ? config.spamAction : config.antilinkAction;
+  if (reason === 'spam' || reason === 'antilink' || reason === 'antidoc') {
+    const action = reason === 'antidoc' ? config.antilinkAction : reason === 'spam' ? config.spamAction : config.antilinkAction;
     const warns = addWarn(`${jid}:${getCleanUserNumber(sender)}`);
 
     await sock.sendMessage(

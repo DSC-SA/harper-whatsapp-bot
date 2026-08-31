@@ -20,11 +20,22 @@ export async function handleAntilink(ctx) {
     .filter(Boolean);
 
   const blocked = clean.filter(
-    (d) =>
-      group.blockedLinks.some((b) => d === b || d.endsWith('.' + b)) &&
-      !group.allowedLinks.some((a) => d === a || d.endsWith('.' + a))
+    (d) => !group.allowedLinks.some((a) => d === a || d.endsWith('.' + a))
   );
   if (!blocked.length) return;
+
+  try {
+    await sock.sendMessage(jid, {
+      delete: {
+        remoteJid: jid,
+        fromMe: false,
+        participant: msg.key.participant,
+        id: msg.key.id,
+      },
+    });
+  } catch (e) {
+    console.log(`[harper] antilink delete failed: ${e.message}`);
+  }
 
   await applyPolicy(sock, jid, sender, msg, 'antilink', blocked.join(', '));
 }
