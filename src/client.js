@@ -12,14 +12,28 @@ import pino from 'pino';
 import { buildAuthState } from './session.js';
 import { config } from '../config.js';
 import { recordLidMapping, recordKeyMappings, recordGroupMappings } from './lidmap.js';
+import { setLinkStatus } from './link.js';
 
 const logger = pino({ level: (process.env.LOG_LEVEL || 'warn'), name: 'harper' });
 
+function renderQrAscii(qr) {
+  const qrObj = QRCode.create(qr);
+  const count = qrObj.modules.size;
+  const isDark = (r, c) => qrObj.modules.get(r).get(c);
+  const lines = [];
+  for (let r = 0; r < count; r++) {
+    let row = '';
+    for (let c = 0; c < count; c++) {
+      row += isDark(r, c) ? '\u2588\u2588' : '  ';
+    }
+    lines.push(row);
+  }
+  return lines.join('\n');
+}
+
 function showQr(qr) {
-  qrcodeTerminal.generate(qr, { small: true }, (out) => {
-    console.log('[harper] Scan this QR in WhatsApp > Linked Devices to pair:');
-    console.log(out);
-  });
+  console.log('[harper] Scan this QR in WhatsApp > Linked Devices to pair:');
+  console.log(renderQrAscii(qr));
   QRCode.toFile(config.qrFile, qr, { width: 640, margin: 2 })
     .then(() => console.log(`[harper] QR image saved: ${config.qrFile} (refreshes until scanned)`))
     .catch(async (e) => {
@@ -103,11 +117,13 @@ export async function startClient(handlers) {
       if (qr) showQr(qr);
 
       if (connection === 'open') {
+        setLinkStatus('open');
         console.log(`[harper] connected as ${sock.user?.id || 'unknown'}`);
         handlers?.onConnected?.(sock);
       }
 
       if (connection === 'close') {
+        setLinkStatus('connecting');
         const code = lastDisconnect?.error?.output?.statusCode;
         const registered = !!(authState?.state?.creds?.registered);
         const errMsg = lastDisconnect?.error?.message || '';
