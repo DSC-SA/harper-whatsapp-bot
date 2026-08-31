@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pnFor, lidFor } from './lidmap.js';
+import { getGroupMetadata, fetchAllGroups, getGroupIds } from './groupCache.js';
 
 const FILE = 'data/admins.json';
 const norm = (j) => String(j || '').replace(/:[0-9]+/, '').toLowerCase();
@@ -34,8 +35,7 @@ function persist() {
 export async function refreshGroupAdmins(sock, groupJid) {
   if (!groupJid) return;
   if (pending.has(groupJid)) return pending.get(groupJid);
-  const prom = sock
-    .groupMetadata(groupJid)
+  const prom = getGroupMetadata(sock, groupJid)
     .then((meta) => {
       const lids = new Set();
       const pns = new Set();
@@ -58,20 +58,27 @@ export async function refreshGroupAdmins(sock, groupJid) {
 
 export async function refreshAllAdmins(sock) {
   try {
-    const groups = await sock.groupFetchAllParticipating();
-    for (const gid of Object.keys(groups || {})) {
+    const groups = await fetchAllGroups(sock);
+    const ids = Object.keys(groups || {});
+    for (const gid of ids) {
+      const existing = registry.get(gid);
+      if (existing && (existing.lids?.size || existing.pns?.size)) continue;
       refreshGroupAdmins(sock, gid).catch(() => {});
     }
-    console.log(`[harper] admin detection updated across ${Object.keys(groups || {}).length} groups`);
+    console.log(`[harper] admin detection checked across ${ids.length} groups (rate-limit aware)`);
   } catch (e) {
-    console.log(`[harper] admin refresh failed: ${e.message}`);
+    if (e?.isRateLimited) {
+      console.log(`[harper] admin refresh skipped: ${e.message}`);
+    } else {
+      console.log(`[harper] admin refresh failed: ${e.message}`);
+    }
   }
 }
 
 export function startAdminRefresh(sock) {
   if (refreshTimer) clearInterval(refreshTimer);
   refreshAllAdmins(sock);
-  refreshTimer = setInterval(() => refreshAllAdmins(sock), 60000);
+  refreshTimer = setInterval(() => refreshAllAdmins(sock), 600000);
   return refreshTimer;
 }
 

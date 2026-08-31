@@ -3,6 +3,7 @@ import { replyText, getMentionedJids, getCleanUserNumber, parseNumbers } from '.
 import { getGroup } from '../state.js';
 import { resolveGroupUser, resolveUserJid, pnFor, lidFor } from '../lidmap.js';
 import { config } from '../../config.js';
+import { getGroupMetadata, fetchAllGroups } from '../groupCache.js';
 
 const BANS_FILE = 'data/bans.json';
 const SCAN_MS = 60000;
@@ -47,7 +48,7 @@ export async function kickBannedFromGroup(sock, groupJid, botJid, bannedNums) {
   const botPn = normBot(botJid);
   const botLid = lidFor(botPn);
   try {
-    const meta = await sock.groupMetadata(groupJid);
+    const meta = await getGroupMetadata(sock, groupJid);
     const botAdmin = (meta.participants || []).some((p) => {
       const pid = String(p.id || '').replace(/:[0-9]+/, '').toLowerCase();
       const pjid = String(p.jid || '').replace(/:[0-9]+/, '').toLowerCase();
@@ -87,8 +88,9 @@ export async function kickBannedEverywhere(sock, bannedNums) {
   let skipped = 0;
   let scanned = 0;
   try {
-    const groups = await sock.groupFetchAllParticipating();
-    for (const gid of Object.keys(groups || {})) {
+    const groups = await fetchAllGroups(sock);
+    const gids = Object.keys(groups || {});
+    for (const gid of gids) {
       scanned++;
       const r = await kickBannedFromGroup(sock, gid, sock.user?.id, [...set]);
       kicked += r.kicked;

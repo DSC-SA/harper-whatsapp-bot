@@ -110,16 +110,9 @@ export async function sendText(sock, jid, text, options = {}) {
   return sock.sendMessage(jid, { text }, options);
 }
 
-let metadataCache = new Map();
-
 export async function getGroupMetadata(sock, groupJid, fresh = false) {
-  if (!fresh && metadataCache.has(groupJid)) {
-    const entry = metadataCache.get(groupJid);
-    if (Date.now() - entry.ts < 10000) return entry.meta;
-  }
-  const meta = await sock.groupMetadata(groupJid);
-  metadataCache.set(groupJid, { ts: Date.now(), meta });
-  return meta;
+  const { getGroupMetadata } = await import('./groupCache.js');
+  return getGroupMetadata(sock, groupJid, { fresh });
 }
 
 const normalize = (jid = '') => String(jid).replace(/:[0-9]+/, '');

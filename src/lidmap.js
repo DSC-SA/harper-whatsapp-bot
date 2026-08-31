@@ -82,7 +82,8 @@ export async function recordGroupMappings(sock, groupJid) {
   const cached = metaCache.get(groupJid);
   if (cached && now - cached < 60000) return;
   try {
-    const meta = await sock.groupMetadata(groupJid);
+    const { getGroupMetadata } = await import('./groupCache.js');
+    const meta = await getGroupMetadata(sock, groupJid);
     for (const p of meta?.participants || []) {
       const lid = p.lid || (IS_LID(p.id) ? p.id : null);
       const pn = p.jid || (p.id && !IS_LID(p.id) ? p.id : null);

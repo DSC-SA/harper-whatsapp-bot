@@ -1,5 +1,6 @@
 import { config } from '../../config.js';
 import { replyText } from '../helpers.js';
+import { fetchAllGroups } from '../groupCache.js';
 
 export default [
   {
@@ -38,7 +39,7 @@ export default [
 
       let groups = {};
       try {
-        groups = await sock.groupFetchAllParticipating();
+        groups = await fetchAllGroups(sock);
       } catch (e) {
         return replyText(sock, msg, `Could not fetch groups: ${e.message}`);
       }

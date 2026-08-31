@@ -1,5 +1,6 @@
 import { config } from '../../config.js';
 import { getCleanUserNumber } from '../helpers.js';
+import { getGroupMetadata, getAllGroupIds, fetchAllGroups } from '../groupCache.js';
 import { resolveUserJid, recordGroupMappings, resolveGroupUser } from '../lidmap.js';
 import { markInvited } from '../mlbb/joinInvite.js';
 
@@ -21,7 +22,7 @@ export default [
 
       let groups = [];
       try {
-        const all = await sock.groupFetchAllParticipating();
+        const all = await fetchAllGroups(sock);
         groups = Object.values(all).map((g) => g.id);
       } catch (e) {
         groups = onlyGroups;
@@ -43,7 +44,7 @@ export default [
       for (const gid of groups) {
         try {
           await recordGroupMappings(sock, gid);
-          const meta = await sock.groupMetadata(gid);
+          const meta = await getGroupMetadata(sock, gid);
           for (const p of meta?.participants || []) {
             const pid = p.id || '';
             const resolved = await resolveGroupUser(sock, gid, pid);

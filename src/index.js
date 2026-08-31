@@ -13,6 +13,7 @@ import { markInvited } from './mlbb/joinInvite.js';
 import { startBanScanner, kickBannedJoiner } from './groups/bans.js';
 import { loadAdmins, refreshGroupAdmins, startAdminRefresh } from './admins.js';
 import { startDataSync } from './filesync.js';
+import { fetchAllGroups } from './groupCache.js';
 
 const SKIP_CODES = /EOF|EPIPE|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|SOCKET|EAI_AGAIN/i;
 process.on('uncaughtException', (err) => {
@@ -57,7 +58,8 @@ async function main() {
         if (action === 'add' && config.mlbbRegGroups.includes(jid)) {
           let meta = null;
           try {
-            meta = await sock.groupMetadata(jid);
+            const { getGroupMetadata } = await import('./groupCache.js');
+            meta = await getGroupMetadata(sock, jid);
           } catch {}
           for (const p of update.participants || []) {
             const whoRaw = String(p || '');
@@ -106,7 +108,7 @@ async function main() {
 
 async function warmLidMap(sock) {
   try {
-    const groups = await sock.groupFetchAllParticipating();
+    const groups = await fetchAllGroups(sock);
     for (const g of Object.values(groups)) {
       for (const p of g.participants || []) {
         const lid = p.lid || (String(p.id || '').endsWith('@lid') ? p.id : null);

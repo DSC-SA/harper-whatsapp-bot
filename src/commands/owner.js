@@ -3,6 +3,7 @@ import { getSessionString, resetSignalSessions } from '../session.js';
 import { getVars, setVar } from '../vars.js';
 import { config } from '../../config.js';
 import { recordLidMapping } from '../lidmap.js';
+import { fetchAllGroups, getGroupMetadata } from '../groupCache.js';
 
 const ALLOWED_VARS = new Set([
   'PREFIX',
@@ -125,7 +126,7 @@ export default [
     run: async (ctx, args) => {
       const { sock, msg } = ctx;
       try {
-        const groups = await sock.groupFetchAllParticipating();
+        const groups = await fetchAllGroups(sock);
         for (const g of Object.values(groups)) {
           for (const p of g.participants || []) {
             const lid = p.lid || (String(p.id || '').endsWith('@lid') ? p.id : null);
