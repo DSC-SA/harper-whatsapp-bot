@@ -27,6 +27,7 @@ import bansCmd from './groups/bans.js';
 import securityCmd from './commands/security.js';
 import mlbbCmd, { handlePendingMlbb } from './commands/mlbb.js';
 import vvCmd from './commands/vv.js';
+import reregCmd from './commands/rereg.js';
 
 const commands = [
   ...menuCmd,
@@ -43,6 +44,7 @@ const commands = [
   ...bansCmd,
   ...mlbbCmd,
   ...vvCmd,
+  ...reregCmd,
 ];
 
 const byName = new Map();

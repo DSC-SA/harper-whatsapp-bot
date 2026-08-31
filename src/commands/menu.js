@@ -16,40 +16,37 @@ export default [
 const P = () => config.prefix;
 
 const HELP = {
-  main: `╭━━━ *${config.botName}* ━━━╮
-│  ${config.watermark}
-╰──────────────────╯
-▸ Prefix: *${config.prefix}*
+  main: `╭──────────────────────────╮
+│  *${config.botName}*  -  DawnSphereCommunity
+│      ── ${config.prefix} prefix ──
+╰──────────────────────────╯
 
-📦 *MEDIA*
+✧ MEDIA ✧
   ${P()}sticker · ${P()}toimg · ${P()}attp
-  ${P()}stickerinfo · ${P()}vv (reveal view-once)
+  ${P()}stickerinfo · ${P()}vv
 
-🛡️ *MODERATION*
-  ${P()}kick · ${P()}add · ${P()}promote
-  ${P()}demote · ${P()}mute · ${P()}unmute
-  ${P()}warn · ${P()}warns · ${P()}resetwarns
-  ${P()}welcome
+✧ MODERATION ✧
+  ${P()}kick · ${P()}add · ${P()}promote · ${P()}demote
+  ${P()}mute · ${P()}unmute · ${P()}warn · ${P()}warns
+  ${P()}resetwarns · ${P()}welcome
 
-🔒 *PROTECTION*
-  ${P()}antilink · ${P()}whitelist <url> · ${P()}blocklink
-  ${P()}antispam · ${P()}antibad · ${P()}word
-  ${P()}automute
+✧ PROTECTION ✧
+  ${P()}antilink · ${P()}whitelist · ${P()}blocklink
+  ${P()}antispam · ${P()}antibad · ${P()}word · ${P()}automute
 
-🎮 *MLBB*
+✧ MLBB ✧
   ${P()}mlbbreg (DM) · ${P()}mlbbpf
 
-🧰 *UTILITIES*
-  ${P()}ping · ${P()}alive · ${P()}afk
-  ${P()}menu
+✧ UTILITIES ✧
+  ${P()}ping · ${P()}alive · ${P()}afk · ${P()}menu
 
-👑 *OWNER*
+✧ OWNER ✧
   ${P()}setvar · ${P()}reboot
   ${P()}zushi · ${P()}tushi · ${P()}ope · ${P()}levels
-  ${P()}mysession · ${P()}pair
+  ${P()}mysession · ${P()}pair · ${P()}rereg
 
 ▸ *${P()}help <command>* for details.
-╰━━━━━━━━━━━━━━━━━━━━╯`,
+╰──────────────────────────╯`,
 
   sticker: `*${P()}sticker* — reply to an image, video or GIF → 512×512 WebP sticker with the ${config.watermark} watermark.
 Usage: ${P()}sticker`,
@@ -103,4 +100,7 @@ Usage: ${P()}ope ping`,
   levels: `*${P()}levels* — lists every command and its current access level. * = overridden.`,
   mysession: `*${P()}mysession* — DM only. Returns your SESSION_ID (base64). Never share it.`,
   pair: `*${P()}pair <number>* — DM only. Requests a pairing code for a phone number.`,
+  rereg: `*${P()}rereg [silent]* — scans the community groups and re-sends the welcome/registration prompt to every member (so they can reply *${P()}yes* to register).
+Add *silent* to skip the progress messages.
+Usage: ${P()}rereg`,
 };

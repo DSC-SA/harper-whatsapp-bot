@@ -40,7 +40,7 @@ export const config = {
     return resolve('STICKER_AUTHOR', 'Harper');
   },
   get watermark() {
-    return resolve('WATERMARK', 'DawnSphereCommunity · DSC');
+    return resolve('WATERMARK', 'DawnSphereCommunity | DSC');
   },
   get stickerExif() {
     const v = process.env.STICKER_EXIF;
