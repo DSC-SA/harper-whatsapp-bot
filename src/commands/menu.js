@@ -16,45 +16,40 @@ export default [
 const P = () => config.prefix;
 
 const HELP = {
-  main: `╭━ *${config.botName}* · ${config.watermark}
-▸ Command prefix: *${config.prefix}*
+  main: `╭━━━ *${config.botName}* ━━━╮
+│  ${config.watermark}
+╰──────────────────╯
+▸ Prefix: *${config.prefix}*
 
-┌─ ✧ MEDIA ✧ ─
-│ ${P()}sticker · ${P()}toimg · ${P()}attp
-│ ${P()}stickerinfo
-└─────────────
+📦 *MEDIA*
+  ${P()}sticker · ${P()}toimg · ${P()}attp
+  ${P()}stickerinfo · ${P()}vv (reveal view-once)
 
-┌─ ✧ MODERATION ─ ✧
-│ ${P()}kick · ${P()}add · ${P()}promote
-│ ${P()}demote · ${P()}mute · ${P()}unmute
-│ ${P()}warn · ${P()}warns · ${P()}resetwarns
-│ ${P()}welcome
-└─────────────
+🛡️ *MODERATION*
+  ${P()}kick · ${P()}add · ${P()}promote
+  ${P()}demote · ${P()}mute · ${P()}unmute
+  ${P()}warn · ${P()}warns · ${P()}resetwarns
+  ${P()}welcome
 
-┌─ ✧ PROTECTION ─ ✧
-│ ${P()}antilink ┐  ${P()}allowlink
-│ ${P()}blocklink ┘  ${P()}antispam
-│ ${P()}antibad · ${P()}word
-│ ${P()}automute
-└─────────────
+🔒 *PROTECTION*
+  ${P()}antilink · ${P()}whitelist <url> · ${P()}blocklink
+  ${P()}antispam · ${P()}antibad · ${P()}word
+  ${P()}automute
 
-┌─ ✧ MLBB ─ ✧
-│ ${P()}mlbbreg (DM) · ${P()}mlbbpf
-└─────────────
+🎮 *MLBB*
+  ${P()}mlbbreg (DM) · ${P()}mlbbpf
 
-┌─ ✧ UTILITIES ─ ✧
-│ ${P()}ping · ${P()}alive · ${P()}afk
-│ ${P()}menu
-└─────────────
+🧰 *UTILITIES*
+  ${P()}ping · ${P()}alive · ${P()}afk
+  ${P()}menu
 
-┌─ ✧ OWNER ─ ✧
-│ ${P()}setvar · ${P()}reboot
-│ ${P()}zushi · ${P()}tushi · ${P()}ope · ${P()}levels
-│ ${P()}mysession · ${P()}pair
-└─────────────
+👑 *OWNER*
+  ${P()}setvar · ${P()}reboot
+  ${P()}zushi · ${P()}tushi · ${P()}ope · ${P()}levels
+  ${P()}mysession · ${P()}pair
 
 ▸ *${P()}help <command>* for details.
-╰══ ${config.watermark} ══`,
+╰━━━━━━━━━━━━━━━━━━━━╯`,
 
   sticker: `*${P()}sticker* — reply to an image, video or GIF → 512×512 WebP sticker with the ${config.watermark} watermark.
 Usage: ${P()}sticker`,
@@ -62,6 +57,11 @@ Usage: ${P()}sticker`,
 Usage: ${P()}attp DawnSphere`,
   toimg: `*${P()}toimg* — reply to a sticker to convert it back to an image.`,
   stickerinfo: `*${P()}stickerinfo* — reply to a sticker to see its pack info.`,
+  vv: `*${P()}vv* — reply to a *view-once* photo/video to reveal (re-send) it. Works in groups and DMs.`,
+  whitelist: `*${P()}whitelist <url|domain>* — allows a domain so anti-link won't block it.
+Usage: ${P()}whitelist https://google.com · ${P()}whitelist google.com`,
+  allowlink: `*${P()}whitelist <url|domain>* — allows a domain so anti-link won't block it.
+Usage: ${P()}whitelist https://google.com`,
   kick: `*${P()}kick* — removes members. Mention them or list numbers.
 Usage: ${P()}kick @user`,
   add: `*${P()}add <number[,number]>* — adds members by number.

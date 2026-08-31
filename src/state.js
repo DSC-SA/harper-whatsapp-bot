@@ -32,13 +32,13 @@ export async function initState() {
 export function getGroup(jid) {
   if (!state.groups[jid]) {
     state.groups[jid] = {
-      antilink: config.antilinkDefault,
+      antilink: 'on',
       allowedLinks: [],
       blockedLinks: [],
       antibad: 'off',
       badWords: [],
-      antispam: 'off',
-      antidoc: 'off',
+      antispam: 'on',
+      antidoc: 'on',
       welcome: 'off',
       welcomeMsg: '',
       goodBye: 'off',

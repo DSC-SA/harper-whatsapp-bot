@@ -26,6 +26,7 @@ import spamCmd from './groups/spamprotect.js';
 import bansCmd from './groups/bans.js';
 import securityCmd from './commands/security.js';
 import mlbbCmd, { handlePendingMlbb } from './commands/mlbb.js';
+import vvCmd from './commands/vv.js';
 
 const commands = [
   ...menuCmd,
@@ -41,6 +42,7 @@ const commands = [
   ...spamCmd,
   ...bansCmd,
   ...mlbbCmd,
+  ...vvCmd,
 ];
 
 const byName = new Map();
@@ -75,7 +77,7 @@ function buildCtx(sock, msg) {
 }
 
 async function runWithChecks(ctx, cmd, args) {
-  const lvl = getOverride(cmd.name) || (cmd.owner ? 'owner' : cmd.admin ? 'admin' : 'public');
+  const lvl = getOverride(cmd.name) || (cmd.owner ? 'owner' : cmd.admin ? 'admin' : 'owner');
   if (lvl === 'owner' && !ctx.isOwner) {
     console.log(`[harper] owner-blocked: cmd=${cmd.name} sender=${ctx.sender} remote=${ctx.msg?.key?.remoteJid} fromMe=${ctx.msg?.key?.fromMe} sp=${ctx.msg?.key?.senderPn} pp=${ctx.msg?.key?.participantPn} sl=${ctx.msg?.key?.senderLid}`);
     return { skipped: 'owner' };

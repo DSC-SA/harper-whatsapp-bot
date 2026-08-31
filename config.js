@@ -63,17 +63,17 @@ export const config = {
   },
 
   get antilinkDefault() {
-    return resolve('DEFAULT_ANTILINK', 'off');
+    return resolve('DEFAULT_ANTILINK', 'on');
   },
   get antilinkAction() {
     return resolve('ANTILINK_ACTION', 'warn');
   },
 
   get floodLimit() {
-    return num(resolve('FLOOD_LIMIT', '6'), 6);
+    return num(resolve('FLOOD_LIMIT', '10'), 10);
   },
   get floodWindow() {
-    return num(resolve('FLOOD_WINDOW', '15'), 15);
+    return num(resolve('FLOOD_WINDOW', '30'), 30);
   },
   get spamAction() {
     return resolve('SPAM_ACTION', 'mute');

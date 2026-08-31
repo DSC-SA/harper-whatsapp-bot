@@ -103,13 +103,6 @@ export async function buildAuthState() {
   const saveCreds = async () => {
     sessionString = encodeSessionString({ creds, keys: keysObj });
     await writeState(creds, keysObj);
-    try {
-      const { mkdirSync, writeFileSync } = await import('node:fs');
-      const { dirname } = await import('node:path');
-      const f = 'data/session_string.txt';
-      mkdirSync(dirname(f), { recursive: true });
-      writeFileSync(f, sessionString, 'utf8');
-    } catch {}
   };
 
   const state = { creds, keys: store };
