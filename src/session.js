@@ -2,6 +2,7 @@ import { initAuthCreds, BufferJSON } from '@whiskeysockets/baileys';
 import * as WAProto from '@whiskeysockets/baileys/WAProto/index.js';
 import { mkdir, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
+import { createHash } from 'crypto';
 import { config } from '../config.js';
 
 const proto = WAProto.proto || WAProto.default?.proto;
@@ -43,6 +44,12 @@ async function writeState(creds, keysObj) {
 }
 
 export async function buildAuthState() {
+  if (config.sessionId) {
+    const sh = createHash('sha256').update(config.sessionId).digest('hex').slice(0,12);
+    console.log(`[harper] SESSION_ID loaded from env: len=${config.sessionId.length} sha256=${sh}`);
+  } else {
+    console.log(`[harper] SESSION_ID empty; reading from disk: ${config.sessionDir}`);
+  }
   let creds = null;
   let keysObj = {};
 
