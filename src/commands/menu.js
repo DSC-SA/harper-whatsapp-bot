@@ -16,10 +16,20 @@ export default [
 const P = () => config.prefix;
 
 const HELP = {
-  main: `╭──────────────────────────╮
-│  *${config.botName}*  -  DawnSphereCommunity
-│      ── ${config.prefix} prefix ──
-╰──────────────────────────╯
+  main: (() => {
+    const box = (lines, width) => {
+      const top = `╭${'─'.repeat(width)}╮`;
+      const mid = lines.map((l) => `│${l}${' '.repeat(width - l.length)}│`).join('\n');
+      const bot = `╰${'─'.repeat(width)}╯`;
+      return `${top}\n${mid}\n${bot}`;
+    };
+    const title = `  *${config.botName}*  -  DawnSphereCommunity`;
+    const head = [
+      title,
+      `      ── ${config.prefix} prefix ──`,
+    ];
+    const w = Math.max(...head.map((l) => l.length));
+    return `${box(head, w)}
 
 ✧ MEDIA ✧
   ${P()}sticker · ${P()}toimg · ${P()}attp
@@ -46,7 +56,8 @@ const HELP = {
   ${P()}mysession · ${P()}pair · ${P()}rereg
 
 ▸ *${P()}help <command>* for details.
-╰──────────────────────────╯`,
+╰${'─'.repeat(`▸ *${P()}help <command>* for details.`.length)}╯`;
+  })(),
 
   sticker: `*${P()}sticker* — reply to an image, video or GIF → 512×512 WebP sticker with the ${config.watermark} watermark.
 Usage: ${P()}sticker`,
