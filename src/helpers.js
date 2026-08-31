@@ -102,7 +102,8 @@ export async function downloadMedia(msg, sock) {
 
 export async function replyText(sock, msg, text, options = {}) {
   const remoteJid = msg.key.remoteJid;
-  return sock.sendMessage(remoteJid, { text }, { quoted: msg, ...options });
+  const footer = options.noFooter ? '' : `\n╰══ ${config.watermark} ══`;
+  return sock.sendMessage(remoteJid, { text: `${text}${footer}` }, { quoted: msg, ...options });
 }
 
 export async function sendText(sock, jid, text, options = {}) {
