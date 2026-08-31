@@ -61,6 +61,16 @@ export async function deleteBlob(id) {
   } catch {}
 }
 
+export async function loadBlob(id) {
+  if (!pool || !ready) return null;
+  try {
+    const res = await pool.query(`SELECT data FROM harper_files WHERE id = $1`, [id]);
+    return res.rows.length ? res.rows[0].data : null;
+  } catch {
+    return null;
+  }
+}
+
 export async function getAllBlobs() {
   const out = new Map();
   if (!pool || !ready) return out;

@@ -44,16 +44,22 @@ async function writeState(creds, keysObj) {
 }
 
 export async function buildAuthState() {
-  if (config.sessionId) {
-    const sh = createHash('sha256').update(config.sessionId).digest('hex').slice(0,12);
-    console.log(`[harper] SESSION_ID loaded from env: len=${config.sessionId.length} sha256=${sh}`);
+  let sessionString = config.sessionId;
+  if (!sessionString) {
+    const { loadBlob } = await import('./db.js');
+    const dbSession = await loadBlob('harper_session');
+    if (dbSession) sessionString = dbSession;
+  }
+  if (sessionString) {
+    const sh = createHash('sha256').update(sessionString).digest('hex').slice(0,12);
+    console.log(`[harper] SESSION_ID loaded${config.sessionId ? ' from env' : ' from database'}: len=${sessionString.length} sha256=${sh}`);
   } else {
     console.log(`[harper] SESSION_ID empty; reading from disk: ${config.sessionDir}`);
   }
   let creds = null;
   let keysObj = {};
 
-  const fromEnv = config.sessionId ? decodeSessionString(config.sessionId) : null;
+  const fromEnv = sessionString ? decodeSessionString(sessionString) : null;
   let fromDisk = null;
   if (!fromEnv) {
     try {
