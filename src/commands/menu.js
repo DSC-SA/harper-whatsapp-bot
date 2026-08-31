@@ -32,28 +32,28 @@ const HELP = {
     return `${box(head, w)}
 
 ✧ MEDIA ✧
-  ${P()}sticker · ${P()}toimg · ${P()}attp
-  ${P()}stickerinfo · ${P()}vv
+  ${P()}sticker - ${P()}toimg - ${P()}attp
+  ${P()}stickerinfo - ${P()}vv
 
 ✧ MODERATION ✧
-  ${P()}kick · ${P()}add · ${P()}promote · ${P()}demote
-  ${P()}mute · ${P()}unmute · ${P()}warn · ${P()}warns
-  ${P()}resetwarns · ${P()}welcome
+  ${P()}kick - ${P()}add - ${P()}promote - ${P()}demote
+  ${P()}mute - ${P()}unmute - ${P()}warn - ${P()}warns
+  ${P()}resetwarns - ${P()}welcome
 
 ✧ PROTECTION ✧
-  ${P()}antilink · ${P()}whitelist · ${P()}blocklink
-  ${P()}antispam · ${P()}antibad · ${P()}word · ${P()}automute
+  ${P()}antilink - ${P()}whitelist - ${P()}blocklink
+  ${P()}antispam - ${P()}antibad - ${P()}word - ${P()}automute
 
 ✧ MLBB ✧
-  ${P()}mlbbreg (DM) · ${P()}mlbbpf
+  ${P()}mlbbreg (DM) - ${P()}mlbbpf
 
 ✧ UTILITIES ✧
-  ${P()}ping · ${P()}alive · ${P()}afk · ${P()}menu
+  ${P()}ping - ${P()}alive - ${P()}afk - ${P()}menu
 
 ✧ OWNER ✧
-  ${P()}setvar · ${P()}reboot
-  ${P()}zushi · ${P()}tushi · ${P()}ope · ${P()}levels
-  ${P()}mysession · ${P()}pair · ${P()}rereg
+  ${P()}setvar - ${P()}reboot
+  ${P()}zushi - ${P()}tushi - ${P()}ope - ${P()}levels
+  ${P()}mysession - ${P()}pair - ${P()}rereg
 
 ▸ *${P()}help <command>* for details.
 ╰${'─'.repeat(`▸ *${P()}help <command>* for details.`.length)}╯`;
@@ -67,7 +67,7 @@ Usage: ${P()}attp DawnSphere`,
   stickerinfo: `*${P()}stickerinfo* — reply to a sticker to see its pack info.`,
   vv: `*${P()}vv* — reply to a *view-once* photo/video to reveal (re-send) it. Works in groups and DMs.`,
   whitelist: `*${P()}whitelist <url|domain>* — allows a domain so anti-link won't block it.
-Usage: ${P()}whitelist https://google.com · ${P()}whitelist google.com`,
+Usage: ${P()}whitelist https://google.com - ${P()}whitelist google.com`,
   allowlink: `*${P()}whitelist <url|domain>* — allows a domain so anti-link won't block it.
 Usage: ${P()}whitelist https://google.com`,
   kick: `*${P()}kick* — removes members. Mention them or list numbers.
@@ -91,16 +91,16 @@ Usage: ${P()}antispam on`,
   antibad: `*${P()}antibad on|off* — reacts to bad words.
 *${P()}word add <word>* / *${P()}word remove <word>* — manage the list.`,
   automute: `*${P()}automute on <start HH:MM> <end HH:MM>* — daily mute window. Survives restarts.
-Usage: ${P()}automute on 22:00 07:00 · ${P()}automute off`,
+Usage: ${P()}automute on 22:00 07:00 - ${P()}automute off`,
   afk: `*${P()}afk [reason]* — marks you away; Harper notifies anyone who mentions you. Send any message to clear.`,
   ping: `*${P()}ping* — latency check. Access level is changeable with ${P()}zushi/tushi/ope.`,
   alive: `*${P()}alive* — bot status + uptime.`,
   mlbbreg: `*${P()}mlbbreg* — starts MLBB registration (DM only). You'll give a Role ID, Zone ID and a verification code from your in-game mail.`,
   mlbbpf: `*${P()}mlbbpf* — generates your MLBB profile card with current stats.`,
   setvar: `*${P()}setvar KEY=value* — sets a config var at runtime, instantly, and persists it.
-Aliases: ${P()}setvar=KEY=value · ${P()}var · ${P()}env
-Usage: ${P()}setvar SUDO=27812345678 · ${P()}setvar PREFIX=/
-List current: ${P()}setvar · Reset: ${P()}setvar KEY=`,
+Aliases: ${P()}setvar=KEY=value - ${P()}var - ${P()}env
+Usage: ${P()}setvar SUDO=27812345678 - ${P()}setvar PREFIX=/
+List current: ${P()}setvar - Reset: ${P()}setvar KEY=`,
   reboot: `*${P()}reboot* — restarts the bot process. Owner only.`,
   zushi: `*${P()}zushi <command>* — makes a command public (anyone can use it).
 Usage: ${P()}zushi ping`,

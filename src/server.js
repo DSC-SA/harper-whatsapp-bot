@@ -55,7 +55,7 @@ export function startServer() {
 <body>
   <div class="card">
     <h1>${config.botName}</h1>
-    <p class="sub">DawnSphereCommunity · DSC</p>
+    <p class="sub">DawnSphereCommunity - DSC</p>
     <div class="qr"><img id="qrImg" alt="QR code"></div>
     <div class="ok" id="okBox">&#9989; Bot is connected &amp; ready.</div>
     <div class="wait" id="waitBox">Generating QR... please wait.</div>
