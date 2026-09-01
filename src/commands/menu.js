@@ -111,7 +111,7 @@ Usage: ${P()}add 919876543210,919876543211`,
   mute: `*${P()}mute* — locks the group so only admins can chat.`,
   unmute: `*${P()}unmute* — reopens the group.`,
   welcome: `*${P()}welcome on|off* — welcome/goodbye notices.
-*${P()}welcome set <msg>* — customize (use {name} for the member).
+When on, new members get a warm welcome with their profile pic, @mention, and the group name.
 Usage: ${P()}welcome on`,
   warn: `*${P()}warn @user|reply* — adds a warning; after MAX_WARNS the user is kicked globally.
 *${P()}warns @user* — show count. *${P()}unwarn @user* — remove 1 warn.

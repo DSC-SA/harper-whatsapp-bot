@@ -14,6 +14,7 @@ import { startBanScanner, kickBannedJoiner } from './groups/bans.js';
 import { loadAdmins, refreshGroupAdmins, startAdminRefresh } from './admins.js';
 import { startDataSync } from './filesync.js';
 import { fetchAllGroups } from './groupCache.js';
+import axios from 'axios';
 
 const SKIP_CODES = /EOF|EPIPE|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|SOCKET|EAI_AGAIN/i;
 process.on('uncaughtException', (err) => {
@@ -84,9 +85,12 @@ async function main() {
           }
         }
         if (action === 'add' && group.welcome === 'on') {
-          const text = (group.welcomeMsg || 'Welcome to the group! {name}')
-            .replace(/\{name\}/g, 'everyone');
-          await sock.sendMessage(jid, { text, mentions: update.participants });
+          let meta = null;
+          try {
+            const { getGroupMetadata } = await import('./groupCache.js');
+            meta = await getGroupMetadata(sock, jid, { fresh: true });
+          } catch {}
+          await sendRichWelcome(sock, jid, update.participants || [], meta);
         } else if (action === 'remove' && group.goodbye === 'on') {
           await sock.sendMessage(jid, { text: 'A member has left the group.' });
         }
@@ -119,6 +123,45 @@ async function warmLidMap(sock) {
     console.log(`[harper] lid map warmed: ${Object.keys(loadLidMap().lidToPn).length} known lids`);
   } catch (e) {
     console.log(`[harper] lid map warm failed: ${e.message}`);
+  }
+}
+
+function resolveParticipantJid(meta, whoRaw) {
+  const entry = (meta?.participants || []).find(
+    (m) => String(m.id) === whoRaw || String(m.lid || '') === whoRaw
+  );
+  if (entry?.jid) return entry.jid;
+  if (entry && !String(entry.id || '').endsWith('@lid')) return entry.id;
+  return resolveUserJid(whoRaw) || whoRaw;
+}
+
+async function sendRichWelcome(sock, jid, participants, meta) {
+  const groupName = meta?.subject || 'this group';
+  for (const p of participants) {
+    const whoRaw = String(p || '');
+    const mention = resolveParticipantJid(meta, whoRaw);
+    const num = getCleanUserNumber(mention);
+    if (!num || num === getCleanUserNumber(sock.user?.id)) continue;
+
+    const text = `👋 *Welcome @${num} to ${groupName}!*\n\nWe're so glad to have you here. Please read the pinned rules, introduce yourself, and enjoy your stay with us. 🎉`;
+
+    let image = null;
+    try {
+      const url = await sock.profilePictureUrl(mention, 'image');
+      if (url) {
+        const resp = await axios.get(url, { responseType: 'arraybuffer', timeout: 10000 });
+        image = Buffer.from(resp.data);
+      }
+    } catch {}
+
+    const content = image
+      ? { image, caption: text, mentions: [mention] }
+      : { text, mentions: [mention] };
+    try {
+      await sock.sendMessage(jid, content);
+    } catch (e) {
+      console.log(`[harper] rich welcome failed for ${num}: ${e.message}`);
+    }
   }
 }
 
