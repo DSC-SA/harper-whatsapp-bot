@@ -9,7 +9,7 @@ import {
   hasPendingSession,
 } from '../mlbb/registration.js';
 import { generateProfileCard } from '../mlbb/cardGenerator.js';
-import { hasInvite, clearInvite } from '../mlbb/joinInvite.js';
+import { clearInvite } from '../mlbb/joinInvite.js';
 import { resolveUserJid } from '../lidmap.js';
 
 const cleanNumber = (jid) => String(resolveUserJid(jid) || '').replace(/:[0-9]+/, '').split('@')[0];
@@ -32,10 +32,6 @@ export default [
     run: async (ctx) => {
       const { sock, jid, sender } = ctx;
       const uid = cleanNumber(sender) || sender;
-      if (!hasInvite(uid)) {
-        await sock.sendMessage(jid, { text: 'I have not invited you to register yet. If you would like to register, send: *!mlbbreg*' });
-        return;
-      }
       clearInvite(uid);
       await startRegistration(sock, jid, sender);
     },
