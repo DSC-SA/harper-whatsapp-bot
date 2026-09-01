@@ -59,7 +59,10 @@ export const config = {
     return num(resolve('PORT', '3000'), 3000);
   },
   get keepAliveMinutes() {
-    return num(resolve('KEEP_ALIVE_MIN', '40'), 40);
+    return num(resolve('KEEP_ALIVE_MIN', '15'), 15);
+  },
+  get keepAliveSeconds() {
+    return num(resolve('KEEP_ALIVE_SEC', String(this.keepAliveMinutes * 60)), this.keepAliveMinutes * 60);
   },
 
   get antilinkDefault() {

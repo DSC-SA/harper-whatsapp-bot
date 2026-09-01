@@ -106,16 +106,16 @@ export function startKeepAlive() {
     console.log('[harper] keepalive disabled (set HARPER_APP_URL to your public URL)');
     return null;
   }
-  const minutes = Math.max(1, config.keepAliveMinutes);
+  const seconds = Math.max(15, config.keepAliveSeconds);
   const base = url.replace(/\/+$/, '');
-  console.log(`[harper] keepalive every ${minutes}min -> ${base}/health`);
+  console.log(`[harper] keepalive every ${seconds}s -> ${base}/health`);
   const tick = async () => {
     try {
-      await axios.get(`${base}/health`, { timeout: 15000 });
+      await axios.get(`${base}/health`, { timeout: 10000 });
     } catch (e) {
       console.log(`[harper] keepalive ping failed: ${e.message}`);
     }
   };
   tick();
-  return setInterval(tick, minutes * 60 * 1000);
+  return setInterval(tick, seconds * 1000);
 }
