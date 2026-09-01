@@ -151,8 +151,13 @@ export async function handleMessage(sock, msg) {
     return { handled: false };
   }
 
+  if (process.env.DEBUG_MSG === '1') {
+    console.log(`[harper] CMD group=${ctx.isGroup} remote=${ctx.jid} cmd=${cmd.name} sender=${ctx.sender} isOwner=${ctx.isOwner}`);
+  }
+
   const out = await runWithChecks(ctx, cmd, cmdArgs);
   if (out.skipped) {
+    if (process.env.DEBUG_MSG === '1') console.log(`[harper] SKIP cmd=${cmd.name} reason=${out.skipped} group=${ctx.isGroup}`);
     await ctx.sock.sendMessage(ctx.jid, { text: SKIP_MSG[out.skipped] }, { quoted: msg });
   }
   return { handled: !!out.result };

@@ -9,7 +9,7 @@ const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.ur
 const STYLES = ['group', 'protection', 'media', 'mlbb', 'utils'];
 const CATS = {
   group: ['kick', 'add', 'promote', 'demote', 'mute', 'unmute', 'warn', 'warns', 'unwarn', 'resetwarns', 'welcome', 'automute', 'amute', 'aunmute'],
-  protection: ['antilink', 'whitelist', 'blocklink', 'antispam', 'antibad', 'word', 'antidoc', 'whitelistdoc'],
+  protection: ['antilink', 'whitelist', 'blocklink', 'antispam', 'spamallow', 'antibad', 'word', 'antidoc', 'whitelistdoc'],
   media: ['sticker', 'attp', 'toimg', 'stickerinfo', 'vv'],
   mlbb: ['mlbbreg', 'mlbbpf', 'yes'],
   utils: ['ping', 'alive', 'afk', 'menu', 'help', 'pair', 'rereg', 'chant'],

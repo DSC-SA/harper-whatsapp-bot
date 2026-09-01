@@ -147,6 +147,9 @@ export async function startClient(handlers) {
           recordKeyMappings(msg.key);
           if (msg.key.fromMe) continue;
           if (type !== 'notify') continue;
+          if (process.env.DEBUG_MSG === '1') {
+            console.log(`[harper] upsert type=${type} remote=${msg.key.remoteJid} from=${msg.key.participant || msg.key.remoteJid} body=${(msg.message?.conversation || msg.message?.extendedTextMessage?.text || '').slice(0, 40)}`);
+          }
           await handlers?.onMessage?.(sock, msg);
         }
       } catch (e) {

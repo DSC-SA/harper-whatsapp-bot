@@ -1,4 +1,4 @@
-import { replyText, getMessageBody, isOwner } from '../helpers.js';
+import { replyText, getMessageBody, isOwner, getMentionedJids, getCleanUserNumber, parseNumbers } from '../helpers.js';
 import { config } from '../../config.js';
 import { getGroup, saveGroup, getFlood, pushFlood, resetFlood } from '../state.js';
 import { applyPolicy } from './policies.js';
@@ -8,6 +8,10 @@ const ACTION_DELAY = 4000;
 export function handleSpam(ctx) {
   const { sock, jid, group, sender, isGroup } = ctx;
   if (!isGroup || !group || group.antispam !== 'on' || isOwner(sender)) return;
+
+  const senderNum = getCleanUserNumber(sender);
+  const allow = group.spamAllow || [];
+  if (allow.includes(senderNum)) return;
 
   const now = Date.now();
   const windowMs = config.floodWindow * 1000;
@@ -67,6 +71,56 @@ export default [
         return replyText(sock, msg, 'Anti-spam OFF.');
       }
       return replyText(sock, msg, 'Usage: !antispam on | off');
+    },
+  },
+  {
+    name: 'spamallow',
+    aliases: ['spamallow'],
+    group: true,
+    admin: true,
+    run: async (ctx, args) => {
+      const { sock, msg, jid } = ctx;
+      const group = getGroup(jid);
+      const allow = Array.isArray(group.spamAllow) ? group.spamAllow : [];
+      const sub = (args[0] || '').toLowerCase();
+
+      if (sub === 'list') {
+        return replyText(sock, msg, `Spam-allowed users: ${allow.length ? allow.map((n) => `@${n}`).join(', ') : 'none'}`);
+      }
+      if (sub === 'clear') {
+        group.spamAllow = [];
+        saveGroup(jid, group);
+        return replyText(sock, msg, 'Spam allow-list cleared.');
+      }
+
+      const mentioned = getMentionedJids(msg).map(getCleanUserNumber).filter(Boolean);
+      let targetNum = null;
+      if (args[0] && sub !== 'remove' && sub !== 'del') {
+        const nums = parseNumbers(args.join(' ')).map((n) => String(n).replace(/[^0-9]/g, '')).filter((n) => n.length);
+        if (nums.length) targetNum = nums[0];
+      }
+      if (!targetNum && mentioned.length) targetNum = mentioned[0];
+
+      if (!targetNum) {
+        return replyText(
+          sock,
+          msg,
+          `Usage: ${config.prefix}spamallow @user · ${config.prefix}spamallow <number> · ${config.prefix}spamallow remove @user · ${config.prefix}spamallow list · ${config.prefix}spamallow clear`
+        );
+      }
+
+      const removing = sub === 'remove' || sub === 'del';
+      if (removing) {
+        const i = allow.indexOf(targetNum);
+        if (i >= 0) allow.splice(i, 1);
+        group.spamAllow = allow;
+        saveGroup(jid, group);
+        return replyText(sock, msg, `@${targetNum} is no longer spam-allowed.`);
+      }
+      if (!allow.includes(targetNum)) allow.push(targetNum);
+      group.spamAllow = allow;
+      saveGroup(jid, group);
+      return replyText(sock, msg, `@${targetNum} can now spam / is exempt from anti-spam.`);
     },
   },
   {
