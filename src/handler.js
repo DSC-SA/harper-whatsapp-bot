@@ -88,6 +88,7 @@ async function runWithChecks(ctx, cmd, args) {
   }
   if (lvl === 'admin') {
     if (ctx.isGroup) {
+      if (ctx.isAdmin === undefined) ctx.isAdmin = await isGroupAdmin(ctx.sock, ctx.groupJid, ctx.sender);
       if (!ctx.isAdmin) return { skipped: 'admin' };
     } else if (!ctx.isOwner) {
       return { skipped: 'owner' };
@@ -109,9 +110,6 @@ const SKIP_MSG = {
 export async function handleMessage(sock, msg) {
   const ctx = buildCtx(sock, msg);
 
-  if (ctx.isGroup) {
-    ctx.isAdmin = await isGroupAdmin(sock, ctx.groupJid, ctx.sender);
-  }
   ctx.isOwner = ownerCheck(ctx.sender);
   ctx.quotedSender = getQuotedSenderFrom(msg);
 
@@ -122,10 +120,10 @@ export async function handleMessage(sock, msg) {
   if (mlbbPending) return { handled: true };
 
   if (ctx.isGroup) {
-    await handleAntilink(ctx, msg);
+    handleAntilink(ctx, msg).catch((e) => console.log(`[harper] antilink err: ${e.message}`));
     handleSpam(ctx);
-    await handleBadWord(ctx);
-    await handleAntidoc(ctx, msg);
+    handleBadWord(ctx).catch((e) => console.log(`[harper] badword err: ${e.message}`));
+    handleAntidoc(ctx, msg).catch((e) => console.log(`[harper] antidoc err: ${e.message}`));
   }
 
   const afkNotice = await handleAfk(ctx);
