@@ -6,7 +6,7 @@
 import { getLinkStatus } from './link.js';
 
 const CHECK_MS = 15000;            // how often the supervisor runs
-const STALL_GRACE_MS = 90000;      // how long a task may go without a heartbeat before we consider it stalled
+const STALL_GRACE_MS = 60000;      // extra time beyond a task's own interval before we consider it stalled
 
 const tasks = new Map();           // id -> { id, name, expected, lastBeat, start, stop, beats, errors, state }
 
@@ -52,7 +52,10 @@ export function taskError(id, err) {
 }
 
 function isStalled(t) {
-  return Date.now() - t.lastBeat > STALL_GRACE_MS;
+  // A task is only "stalled" if it has gone well past its own expected
+  // cadence. interval<=0 (one-shot like lidmap) uses a fixed grace.
+  const grace = (t.expected > 0 ? t.expected : STALL_GRACE_MS) + STALL_GRACE_MS;
+  return Date.now() - t.lastBeat > grace;
 }
 
 function restartTask(t) {
