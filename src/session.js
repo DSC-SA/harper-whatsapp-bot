@@ -43,7 +43,7 @@ async function writeState(creds, keysObj) {
   }
 }
 
-export async function buildAuthState() {
+export async function buildAuthState(fresh = false) {
   let sessionString = config.sessionId;
   if (!sessionString) {
     const { loadBlob } = await import('./db.js');
@@ -61,7 +61,7 @@ export async function buildAuthState() {
 
   const fromEnv = sessionString ? decodeSessionString(sessionString) : null;
   let fromDisk = null;
-  if (!fromEnv) {
+  if (!fromEnv && !fresh) {
     try {
       fromDisk = JSON.parse(await readFile(STATE_FILE, 'utf8'), BufferJSON.reviver);
     } catch {
@@ -69,7 +69,7 @@ export async function buildAuthState() {
     }
   }
 
-  const source = fromEnv || fromDisk;
+  const source = fresh ? null : (fromEnv || fromDisk);
   if (source) {
     creds = source.creds || null;
     if (source.keys) keysObj = source.keys;
@@ -103,6 +103,14 @@ export async function buildAuthState() {
   const saveCreds = async () => {
     sessionString = encodeSessionString({ creds, keys: keysObj });
     await writeState(creds, keysObj);
+    // Persist to the database too so the session survives Koyeb's ephemeral
+    // disk on the next redeploy. Load order: env SESSION_ID > harper_session
+    // blob > local disk - so writing the blob guarantees a restart keeps the
+    // freshly-scanned session alive.
+    try {
+      const { saveBlob } = await import('./db.js');
+      await saveBlob('harper_session', sessionString);
+    } catch {}
   };
 
   const state = { creds, keys: store };

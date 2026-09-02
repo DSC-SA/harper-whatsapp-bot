@@ -4,6 +4,7 @@ import { getVars, setVar } from '../vars.js';
 import { config } from '../../config.js';
 import { recordLidMapping } from '../lidmap.js';
 import { fetchAllGroups, getGroupMetadata } from '../groupCache.js';
+import { getRepair } from '../repair.js';
 
 const ALLOWED_VARS = new Set([
   'PREFIX',
@@ -94,8 +95,31 @@ export default [
     owner: true,
     run: async (ctx, args) => {
       const { sock, msg } = ctx;
+      const a0 = String(args[0] || '').toLowerCase();
       const number = String(args[0] || '').replace(/[^0-9]/g, '');
-      if (number.length < 10) return replyText(sock, msg, `Usage: ${config.prefix}pair <number>\nExample: ${config.prefix}pair 919876543210`);
+
+      // /pair qr  -> force a fresh QR re-link (surfaces on the web page/console)
+      if (a0 === 'qr' || a0 === 'fresh' || a0 === 'scan') {
+        const rep = getRepair();
+        if (!rep) return replyText(sock, msg, 'Repair bridge not ready yet. Try again in a few seconds.');
+        const appUrl = config.appUrl || '(not set - use Koyeb console)';
+        await replyText(
+          sock,
+          msg,
+          `*Fresh QR re-link*\n\nI'm about to disconnect and show a brand-new QR.\n\n⚠️ Once I unlink, I can't message here - open this page on your phone browser instead:\n${appUrl}\n\nScan the QR there with the bot phone (Link a Device).\nI'll save the new session automatically once you scan.`
+        );
+        const ok = rep();
+        if (!ok) return replyText(sock, msg, 'A fresh re-pair is already in progress, or I could not disconnect right now.');
+        return;
+      }
+
+      if (number.length < 10) {
+        return replyText(
+          sock,
+          msg,
+          `*Pairing*\n\n• ${config.prefix}pair <number> — get an 8-digit pairing code (bot stays online, type the code into the bot phone).\n• ${config.prefix}pair qr — force a fresh QR re-link (bot briefly disconnects; QR shows on the web page/Koyeb console).`
+        );
+      }
       try {
         await replyText(sock, msg, `Requesting pairing code for ${number}...`);
         const code = await sock.requestPairingCode(number);

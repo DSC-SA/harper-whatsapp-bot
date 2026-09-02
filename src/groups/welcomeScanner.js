@@ -5,11 +5,12 @@ import { getAllGroupIds, getGroupMetadata } from '../groupCache.js';
 import { getCleanUserNumber } from '../helpers.js';
 import { resolveUserJid, recordLidMapping } from '../lidmap.js';
 import { sendRichWelcome } from '../welcome.js';
+import { registerTask, beat, taskError } from '../tasks.js';
 
 const FILE = 'data/welcomeRoster.json';
 
 let roster = {};
-let scannerStarted = false;
+let scanTimer = null;
 
 function load() {
   try {
@@ -111,18 +112,30 @@ async function sweep(sock) {
 }
 
 export function startWelcomeScanner(sock) {
-  if (scannerStarted) return;
-  scannerStarted = true;
+  if (scanTimer) clearInterval(scanTimer);
   roster = load();
   const mins = Math.max(1, config.welcomeScanMinutes);
   console.log(`[welcomeScanner] scanning every ${mins}min for missed join welcomes`);
   const tick = async () => {
     try {
       await sweep(sock);
+      beat('welcome');
     } catch (e) {
-      console.log(`[welcomeScanner] sweep error: ${e.message}`);
+      taskError('welcome', e);
     }
   };
   tick();
-  return setInterval(tick, mins * 60 * 1000);
+  scanTimer = setInterval(tick, mins * 60 * 1000);
+
+  registerTask({
+    id: 'welcome',
+    name: 'missed-join welcome scanner',
+    expected: mins * 60 * 1000,
+    start: (s = sock) => startWelcomeScanner(s),
+    stop: () => {
+      if (scanTimer) clearInterval(scanTimer);
+      scanTimer = null;
+    },
+  });
+  return scanTimer;
 }

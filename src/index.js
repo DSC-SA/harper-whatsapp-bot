@@ -16,6 +16,7 @@ import { startDataSync } from './filesync.js';
 import { fetchAllGroups } from './groupCache.js';
 import { sendRichWelcome } from './welcome.js';
 import { startWelcomeScanner, markWelcomeSeen } from './groups/welcomeScanner.js';
+import { startSupervisor, registerTask, beat } from './tasks.js';
 
 const SKIP_CODES = /EOF|EPIPE|ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|SOCKET|EAI_AGAIN/i;
 process.on('uncaughtException', (err) => {
@@ -34,6 +35,7 @@ async function main() {
 
   startServer();
   startKeepAlive();
+  startSupervisor();
 
   await startClient({
     onMessage: (sock, msg) => handleMessage(sock, msg),
@@ -107,6 +109,13 @@ async function main() {
       startBanScanner(sock);
       startAdminRefresh(sock);
       startWelcomeScanner(sock);
+      registerTask({
+        id: 'lidmap',
+        name: 'lid->phone map warm',
+        expected: 0,
+        start: () => warmLidMap(sock),
+      });
+      beat('lidmap');
     },
   });
 

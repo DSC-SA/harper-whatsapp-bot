@@ -13,6 +13,7 @@ import { buildAuthState } from './session.js';
 import { config } from '../config.js';
 import { recordLidMapping, recordKeyMappings, recordGroupMappings } from './lidmap.js';
 import { setLinkStatus } from './link.js';
+import { registerRepair } from './repair.js';
 
 const logger = pino({ level: (process.env.LOG_LEVEL || 'warn'), name: 'harper' });
 
@@ -92,6 +93,7 @@ export async function startClient(handlers) {
   let deafRestarts = 0;           // consecutive deaf-socket reconnect attempts
   let probeFailStreak = 0;        // consecutive probe failures while socket open
   let closing = false;            // true when we're intentionally tearing down
+  let forceFreshQR = false;       // when true, the next connect ignores stored session to emit a fresh QR
 
   function resetLiveness() {
     lastInboundAt = Date.now();
@@ -175,14 +177,23 @@ export async function startClient(handlers) {
   const connect = async () => {
     closing = false;
     try {
-      authState = await buildAuthState();
+      authState = await buildAuthState(forceFreshQR);
     } catch (e) {
       console.log(`[harper] failed to build auth state: ${e.message}`);
     }
 
     sock = await makeSock(authState);
 
-    await requestPairCode();
+    // Once the fresh socket is built (QR emitted on connect), the one-shot
+    // repair flag is done; any later auto-reconnect uses the normal path.
+    const wasForceFresh = forceFreshQR;
+    forceFreshQR = false;
+
+    // During a forced fresh-QR repair we must NOT auto-request a pairing
+    // code - we want the QR, not a code. Skip until this connect is done.
+    if (!wasForceFresh) {
+      await requestPairCode();
+    }
 
     sock.ev.on('creds.update', authState.saveCreds);
 
@@ -369,8 +380,23 @@ export async function startClient(handlers) {
   };
 
   await connect();
-  return {
+  const handle = {
     getSock: () => sock,
     logger,
+    // Force a fresh re-link: throw away the in-memory session, reconnect as an
+    // unregistered number so WhatsApp emits a brand-new pairing QR (served to
+    // the web page/console via showQr). The stored session is NOT wiped - if
+    // the re-link fails the previous creds remain on disk for a manual restore.
+    forceFreshPair: () => {
+      if (closing) return false;
+      if (forceFreshQR) return false;
+      console.log('[harper] FORCED fresh re-pair requested - reconnecting to show a fresh QR');
+      forceFreshQR = true;
+      teardown(new Error('forced re-pair'));
+      scheduleReconnect(800);
+      return true;
+    },
   };
+  registerRepair(handle.forceFreshPair);
+  return handle;
 }

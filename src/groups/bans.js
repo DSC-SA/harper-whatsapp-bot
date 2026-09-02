@@ -4,6 +4,7 @@ import { getGroup } from '../state.js';
 import { resolveGroupUser, resolveUserJid, pnFor, lidFor } from '../lidmap.js';
 import { config } from '../../config.js';
 import { getGroupMetadata, fetchAllGroups } from '../groupCache.js';
+import { registerTask, beat, taskError } from '../tasks.js';
 
 const BANS_FILE = 'data/bans.json';
 const SCAN_MS = 60000;
@@ -107,15 +108,34 @@ let scanTimer = null;
 export function startBanScanner(sock) {
   if (scanTimer) clearInterval(scanTimer);
   const scan = async () => {
-    const pns = Object.keys(loadBans());
-    if (!pns.length) return;
-    const r = await kickBannedEverywhere(sock, pns);
-    if (r.kicked > 0 || r.skipped > 0) {
-      console.log(`[harper] ban scan: kicked ${r.kicked}, skipped ${r.skipped} (no admin) of ${r.scanned} groups`);
+    try {
+      const pns = Object.keys(loadBans());
+      if (!pns.length) {
+        beat('bans');
+        return;
+      }
+      const r = await kickBannedEverywhere(sock, pns);
+      if (r.kicked > 0 || r.skipped > 0) {
+        console.log(`[harper] ban scan: kicked ${r.kicked}, skipped ${r.skipped} (no admin) of ${r.scanned} groups`);
+      }
+      beat('bans');
+    } catch (e) {
+      taskError('bans', e);
     }
   };
   scan();
   scanTimer = setInterval(scan, SCAN_MS);
+
+  registerTask({
+    id: 'bans',
+    name: 'global ban kicker',
+    expected: SCAN_MS,
+    start: (s = sock) => startBanScanner(s),
+    stop: () => {
+      if (scanTimer) clearInterval(scanTimer);
+      scanTimer = null;
+    },
+  });
   return scanTimer;
 }
 

@@ -4,6 +4,7 @@ import { createReadStream, existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { config } from '../config.js';
 import { getLinkStatus } from './link.js';
+import { getHealthSnapshot, getTaskSnapshot } from './tasks.js';
 
 export function startServer() {
   const app = express();
@@ -17,6 +18,11 @@ export function startServer() {
   app.get('/status', (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.json({ status: getLinkStatus() });
+  });
+
+  app.get('/system', (req, res) => {
+    res.set('Cache-Control', 'no-store');
+    res.json({ health: getHealthSnapshot(), tasks: getTaskSnapshot() });
   });
 
   app.get('/qr.png', (req, res) => {

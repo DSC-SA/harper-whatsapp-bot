@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { pnFor, lidFor } from './lidmap.js';
 import { getGroupMetadata, fetchAllGroups, getGroupIds } from './groupCache.js';
+import { registerTask, beat, taskError } from './tasks.js';
 
 const FILE = 'data/admins.json';
 const norm = (j) => String(j || '').replace(/:[0-9]+/, '').toLowerCase();
@@ -77,8 +78,27 @@ export async function refreshAllAdmins(sock) {
 
 export function startAdminRefresh(sock) {
   if (refreshTimer) clearInterval(refreshTimer);
-  refreshAllAdmins(sock);
-  refreshTimer = setInterval(() => refreshAllAdmins(sock), 600000);
+  const run = async () => {
+    try {
+      await refreshAllAdmins(sock);
+      beat('admins');
+    } catch (e) {
+      taskError('admins', e);
+    }
+  };
+  run();
+  refreshTimer = setInterval(run, 600000);
+
+  registerTask({
+    id: 'admins',
+    name: 'admin registry refresh',
+    expected: 600000,
+    start: (s = sock) => startAdminRefresh(s),
+    stop: () => {
+      if (refreshTimer) clearInterval(refreshTimer);
+      refreshTimer = null;
+    },
+  });
   return refreshTimer;
 }
 

@@ -29,7 +29,7 @@ import mlbbCmd, { handlePendingMlbb } from './commands/mlbb.js';
 import vvCmd from './commands/vv.js';
 import reregCmd from './commands/rereg.js';
 import chantCmd from './commands/chant.js';
-
+import systemCmd from './commands/system.js';
 const commands = [
   ...menuCmd,
   ...aliveCmd,
@@ -47,6 +47,7 @@ const commands = [
   ...vvCmd,
   ...reregCmd,
   ...chantCmd,
+  ...systemCmd,
 ];
 
 const byName = new Map();

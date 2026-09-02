@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import { replyText, isGroupJid } from '../helpers.js';
 import { getGroup, saveGroup, getState } from '../state.js';
 import { config } from '../../config.js';
+import { registerTask, beat, taskError } from '../tasks.js';
 
 const toMin = (hm) => {
   const [h, m] = String(hm).split(':').map(Number);
@@ -55,13 +56,30 @@ export function startAutoMutes(sock) {
         await sock.groupSettingUpdate(jid, wantMuted ? 'announcement' : 'not_announcement');
         applied.set(jid, wantMuted);
       } catch (e) {
-        console.log(`[harper] automute update failed for ${jid}: ${e.message}`);
+        taskError('automute', e);
       }
     }
+    beat('automute');
   };
 
   applyNow();
   task = cron.schedule('* * * * *', applyNow); // every minute
+
+  registerTask({
+    id: 'automute',
+    name: 'auto mute/unmute',
+    expected: 60000,
+    start: (s = sock) => {
+      if (task) task.stop();
+      task = null;
+      applyNow();
+      task = cron.schedule('* * * * *', applyNow);
+    },
+    stop: () => {
+      if (task) task.stop();
+      task = null;
+    },
+  });
   return task;
 }
 
