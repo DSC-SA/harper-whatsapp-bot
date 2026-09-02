@@ -6,8 +6,8 @@ import {
 } from '@whiskeysockets/baileys';
 import qrcodeTerminal from 'qrcode-terminal';
 import QRCode from 'qrcode';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { dirname } from 'node:path';
+import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import pino from 'pino';
 import { buildAuthState } from './session.js';
 import { config } from '../config.js';
@@ -77,6 +77,8 @@ const WATCHDOG_MS = 10000;           // how often the watchdog loop runs
 const PROBE_TIMEOUT_MS = 20000;      // how long we wait for a probe answer before calling it dead
 const RESTART_MAX_DELAY_MS = 30000;  // cap on reconnect backoff
 const DEAF_RESTARTS_BEFORE_EXIT = 2; // deaf reconnects before we hard-restart the process
+
+const FORCE_FRESH_FILE = join(config.sessionDir, 'force_fresh.flag');
 
 export async function startClient(handlers) {
   let sock = null;
@@ -176,6 +178,17 @@ export async function startClient(handlers) {
 
   const connect = async () => {
     closing = false;
+
+    // A forced fresh re-pair survives across a process restart via a marker
+    // file: after a hard exit+recycle the container boots clean, checks the
+    // marker, and builds a fresh auth state that emits a brand-new QR (this
+    // clears any stale Baileys WebSocket state that made in-process re-links
+    // get stuck in "connecting" without ever emitting a QR).
+    if (existsSync(FORCE_FRESH_FILE)) {
+      try { unlinkSync(FORCE_FRESH_FILE); } catch {}
+      forceFreshQR = true;
+    }
+
     try {
       authState = await buildAuthState(forceFreshQR);
     } catch (e) {
@@ -383,17 +396,24 @@ export async function startClient(handlers) {
   const handle = {
     getSock: () => sock,
     logger,
-    // Force a fresh re-link: throw away the in-memory session, reconnect as an
-    // unregistered number so WhatsApp emits a brand-new pairing QR (served to
-    // the web page/console via showQr). The stored session is NOT wiped - if
-    // the re-link fails the previous creds remain on disk for a manual restore.
+    // Force a fresh re-link: mark a hard process restart that will boot into a
+    // clean, unregistered QR-request state. We exit(1) so the container
+    // recycles - in-process reconnects of a fresh socket kept getting stuck in
+    // "connecting" without emitting a QR due to stale Baileys WS state. The
+    // stored session is NOT wiped; it's simply not used on the next boot.
     forceFreshPair: () => {
-      if (closing) return false;
-      if (forceFreshQR) return false;
-      console.log('[harper] FORCED fresh re-pair requested - reconnecting to show a fresh QR');
-      forceFreshQR = true;
+      if (closing || forceFreshQR) return false;
+      console.log('[harper] FORCED fresh re-pair requested - hard-restarting to show a fresh QR');
+      try {
+        mkdirSync(config.sessionDir, { recursive: true });
+        writeFileSync(FORCE_FRESH_FILE, '1', 'utf8');
+      } catch (e) {
+        console.log(`[harper] failed to write fresh-pair marker: ${e.message}`);
+      }
       teardown(new Error('forced re-pair'));
-      scheduleReconnect(800);
+      setLinkStatus('connecting');
+      // Give the marker flush a tick before the hard exit.
+      setTimeout(() => process.exit(1), 300);
       return true;
     },
   };
