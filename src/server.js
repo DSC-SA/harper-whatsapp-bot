@@ -5,6 +5,7 @@ import { resolve } from 'node:path';
 import { config } from '../config.js';
 import { getLinkStatus } from './link.js';
 import { getHealthSnapshot, getTaskSnapshot } from './tasks.js';
+import { triggerRepair } from './repair.js';
 
 export function startServer() {
   const app = express();
@@ -23,6 +24,15 @@ export function startServer() {
   app.get('/system', (req, res) => {
     res.set('Cache-Control', 'no-store');
     res.json({ health: getHealthSnapshot(), tasks: getTaskSnapshot() });
+  });
+
+  app.post('/repair', (req, res) => {
+    const secret = config.repairToken;
+    const got = req.query.token || req.get('x-repair-token') || '';
+    if (!secret || got !== secret) {
+      return res.status(403).json({ error: 'forbidden' });
+    }
+    triggerRepair().then((r) => res.json(r)).catch((e) => res.status(500).json({ error: e.message }));
   });
 
   app.get('/qr.png', (req, res) => {

@@ -1,5 +1,7 @@
 import { getVars } from './src/vars.js';
 
+import { randomUUID } from 'node:crypto';
+
 const str = (v, d) => (v === undefined || v === null || v === '' ? d : String(v));
 const num = (v, d) => {
   const n = Number(v);
@@ -51,6 +53,7 @@ export const config = {
   sessionDir: str(process.env.SESSION_DIR, 'session'),
   qrFile: str(process.env.HARPER_QR_FILE, 'data/qr.png'),
   pairFor: str(process.env.PAIRING_CODE_FOR, ''),
+  repairToken: str(process.env.REPAIR_TOKEN, randomUUID()),
 
   get appUrl() {
     return resolve('HARPER_APP_URL', '') || resolve('PUBLIC_URL', '');

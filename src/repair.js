@@ -10,3 +10,10 @@ export function registerRepair(f) {
 export function getRepair() {
   return fn;
 }
+
+// Force a fresh re-pair over HTTP (token-gated). Returns true if the
+// repair was triggered, false if one is already in progress.
+export async function triggerRepair() {
+  if (!fn) return { ok: false, reason: 'not_ready' };
+  return { ok: !!fn(), reason: fn() ? 'triggered' : 'in_progress' };
+}
