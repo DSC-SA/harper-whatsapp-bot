@@ -19,6 +19,7 @@ export default [
     name: 'mlbbreg',
     aliases: ['mlreg', 'registermlbb'],
     dmOnly: true,
+    public: true,
     desc: 'Register your MLBB account to get your in-game stats (DM only).',
     run: async (ctx) => {
       await startRegistration(ctx.sock, ctx.jid, ctx.sender);
@@ -28,6 +29,7 @@ export default [
     name: 'yes',
     aliases: ['accept', 'sure'],
     dmOnly: true,
+    public: true,
     desc: 'Accept the join invitation and start MLBB registration.',
     run: async (ctx) => {
       const { sock, jid, sender } = ctx;
@@ -39,6 +41,7 @@ export default [
   {
     name: 'mlbbpf',
     aliases: ['mlprofile', 'mlbbcard'],
+    public: true,
     desc: 'Generate your MLBB profile card with stats.',
     run: async (ctx, args) => {
       const { sock, msg, jid } = ctx;

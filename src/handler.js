@@ -82,7 +82,7 @@ function buildCtx(sock, msg) {
 }
 
 async function runWithChecks(ctx, cmd, args) {
-  const lvl = getOverride(cmd.name) || (cmd.owner ? 'owner' : cmd.admin ? 'admin' : 'owner');
+  const lvl = getOverride(cmd.name) || (cmd.owner ? 'owner' : cmd.admin ? 'admin' : cmd.public ? 'public' : 'owner');
   if (lvl === 'owner' && !ctx.isOwner) {
     console.log(`[harper] owner-blocked: cmd=${cmd.name} sender=${ctx.sender} remote=${ctx.msg?.key?.remoteJid} fromMe=${ctx.msg?.key?.fromMe} sp=${ctx.msg?.key?.senderPn} pp=${ctx.msg?.key?.participantPn} sl=${ctx.msg?.key?.senderLid}`);
     return { skipped: 'owner' };
