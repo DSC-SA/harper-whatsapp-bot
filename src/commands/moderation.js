@@ -7,6 +7,7 @@ import {
 } from '../helpers.js';
 import { resolveGroupUser } from '../lidmap.js';
 import { kickBannedEverywhere } from '../groups/bans.js';
+import { seedRoster } from '../groups/welcomeScanner.js';
 import { getGroup, saveGroup, getWarns, setWarns, addWarn, resetWarns } from '../state.js';
 
 const jidForNumber = (n) => `${n}@s.whatsapp.net`;
@@ -144,6 +145,7 @@ export default [
         group.welcome = 'on';
         group.goodbye = 'on';
         saveGroup(jid, group);
+        seedRoster(sock, jid);
         return replyText(sock, msg, 'Welcome/goodbye messages enabled.');
       }
       if (sub === 'off' || sub === 'disable') {

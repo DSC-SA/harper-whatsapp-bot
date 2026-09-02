@@ -64,6 +64,9 @@ export const config = {
   get keepAliveSeconds() {
     return num(resolve('KEEP_ALIVE_SEC', String(this.keepAliveMinutes * 60)), this.keepAliveMinutes * 60);
   },
+  get welcomeScanMinutes() {
+    return num(resolve('WELCOME_SCAN_MIN', '1'), 1);
+  },
 
   get antilinkDefault() {
     return resolve('DEFAULT_ANTILINK', 'on');
