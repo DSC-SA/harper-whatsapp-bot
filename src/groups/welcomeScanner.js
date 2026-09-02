@@ -3,7 +3,7 @@ import { config } from '../../config.js';
 import { getGroup } from '../state.js';
 import { getAllGroupIds, getGroupMetadata } from '../groupCache.js';
 import { getCleanUserNumber } from '../helpers.js';
-import { resolveUserJid } from '../lidmap.js';
+import { resolveUserJid, recordLidMapping } from '../lidmap.js';
 import { sendRichWelcome } from '../welcome.js';
 
 const FILE = 'data/welcomeRoster.json';
@@ -44,6 +44,11 @@ export async function seedRoster(sock, jid) {
   try {
     const meta = await getGroupMetadata(sock, jid, { fresh: true });
     const nums = (meta?.participants || []).map((p) => getCleanUserNumber(p.jid || p.id));
+    for (const p of meta?.participants || []) {
+      const lid = p.lid || (String(p.id || '').endsWith('@lid') ? p.id : null);
+      const pn = p.jid || (p.id && !String(p.id).endsWith('@lid') ? p.id : null);
+      if (lid && pn) recordLidMapping(lid, pn);
+    }
     markWelcomeSeen(jid, nums);
     console.log(`[welcomeScanner] seeded roster for ${jid}: ${nums.length} members`);
   } catch (e) {
@@ -80,6 +85,12 @@ async function sweep(sock) {
       continue;
     }
     if (!meta?.participants) continue;
+
+    for (const p of meta.participants || []) {
+      const lid = p.lid || (String(p.id || '').endsWith('@lid') ? p.id : null);
+      const pn = p.jid || (p.id && !String(p.id).endsWith('@lid') ? p.id : null);
+      if (lid && pn) recordLidMapping(lid, pn);
+    }
 
     ensureGroup(jid);
     const seen = new Set(roster[jid]);

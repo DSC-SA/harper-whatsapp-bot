@@ -59,6 +59,13 @@ async function makeSock(authState) {
     },
     markOnlineOnConnect: true,
     syncFullHistory: false,
+    keepAliveIntervalMs: 25000,
+    connectTimeoutMs: 30000,
+    maxMsgRetryCount: 3,
+    generateHighQualityLinkPreview: false,
+    getMessage: async () => undefined,
+    shouldIgnoreJid: () => false,
+    retryRequestDelayMs: 5000,
   });
 }
 
@@ -67,6 +74,9 @@ export async function startClient(handlers) {
   let authState = null;
   let reconnectTimer = null;
   let pairCodeRequested = false;
+  let watchdogTimer = null;
+  let lastOpenAt = 0;
+  let expectingClose = false;
 
   async function requestPairCode() {
     if (!config.pairFor || authState.state.creds.registered) return;
@@ -118,12 +128,15 @@ export async function startClient(handlers) {
 
       if (connection === 'open') {
         setLinkStatus('open');
+        lastOpenAt = Date.now();
+        expectingClose = false;
         console.log(`[harper] connected as ${sock.user?.id || 'unknown'}`);
         handlers?.onConnected?.(sock);
       }
 
       if (connection === 'close') {
         setLinkStatus('connecting');
+        expectingClose = true;
         const code = lastDisconnect?.error?.output?.statusCode;
         const registered = !!(authState?.state?.creds?.registered);
         const errMsg = lastDisconnect?.error?.message || '';
@@ -134,11 +147,44 @@ export async function startClient(handlers) {
           return;
         }
 
-        const baseDelay = code === DisconnectReason.connectionReplaced ? 10000 : 1500;
-        const jitter = Math.floor(Math.random() * 1500);
-        reconnectTimer = setTimeout(connect, baseDelay + jitter);
+        const replaced = code === DisconnectReason.connectionReplaced;
+        const baseDelay = replaced ? 6000 : 700;
+        const jitter = Math.floor(Math.random() * 700);
+        console.log(`[harper] scheduling reconnect in ${Math.round((baseDelay + jitter) / 1000)}s`);
+        reconnectTimer = setTimeout(() => {
+          connect().catch((e) => console.log(`[harper] reconnect error: ${e.message}`));
+        }, baseDelay + jitter);
       }
     });
+
+    function startWatchdog() {
+      if (watchdogTimer) clearInterval(watchdogTimer);
+      watchdogTimer = setInterval(() => {
+        try {
+          const ws = sock?.ws;
+          const registered = !!(authState?.state?.creds?.registered);
+          const wsDead = !ws || ws.readyState !== 1;
+          const stale = lastOpenAt && Date.now() - lastOpenAt > 45000;
+          if (wsDead && !expectingClose && !reconnectTimer) {
+            console.log(`[harper] watchdog: socket dead (readyState=${ws ? ws.readyState : 'null'}) -> forcing reconnect`);
+            reconnectTimer = setTimeout(() => {
+              reconnectTimer = null;
+              connect().catch((e) => console.log(`[harper] watchdog reconnect error: ${e.message}`));
+            }, 300);
+          } else if (!wsDead && !stale && registered && Date.now() - lastOpenAt > 30000) {
+            console.log(`[harper] watchdog: connected but idle ${Math.round((Date.now() - lastOpenAt) / 1000)}s, sending ping`);
+            try {
+              sock.sendNode({ tag: 'iq', attrs: { to: 's.whatsapp.net', type: 'get', xmlns: 'w:p' }, content: [] });
+            } catch {}
+            lastOpenAt = Date.now();
+          }
+        } catch (e) {
+          console.log(`[harper] watchdog error: ${e.message}`);
+        }
+      }, 15000);
+    }
+
+    startWatchdog();
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       try {
