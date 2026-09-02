@@ -66,8 +66,16 @@ async function makeSock(authState) {
     getMessage: async () => undefined,
     shouldIgnoreJid: () => false,
     retryRequestDelayMs: 5000,
+    defaultQueryTimeoutMs: 60000,
   });
 }
+
+const HEARTBEAT_MS = 25000;          // inbound-liveness silence threshold before we probe
+const PROBE_MS = 45000;              // how often we actively check the receive path
+const WATCHDOG_MS = 10000;           // how often the watchdog loop runs
+const PROBE_TIMEOUT_MS = 20000;      // how long we wait for a probe answer before calling it dead
+const RESTART_MAX_DELAY_MS = 30000;  // cap on reconnect backoff
+const DEAF_RESTARTS_BEFORE_EXIT = 2; // deaf reconnects before we hard-restart the process
 
 export async function startClient(handlers) {
   let sock = null;
@@ -77,6 +85,34 @@ export async function startClient(handlers) {
   let watchdogTimer = null;
   let lastOpenAt = 0;
   let expectingClose = false;
+
+  let lastInboundAt = 0;          // last time any inbound frame arrived (messages/receipts)
+  let lastProbeAt = 0;            // last time we ran an active liveness probe
+  let probeInFlight = false;      // guard against overlapping probes
+  let deafRestarts = 0;           // consecutive deaf-socket reconnect attempts
+  let probeFailStreak = 0;        // consecutive probe failures while socket open
+  let closing = false;            // true when we're intentionally tearing down
+
+  function resetLiveness() {
+    lastInboundAt = Date.now();
+    lastProbeAt = Date.now();
+    probeFailStreak = 0;
+  }
+
+  // Touched by every inbound event - this is the ONLY signal that truly proves
+  // WhatsApp is delivering messages to us. If this ever goes quiet for too long,
+  // we are deaf even if the raw websocket still reports OPEN.
+  const markInbound = () => {
+    if (!lastInboundAt) lastInboundAt = Date.now();
+    else {
+      const prev = lastInboundAt;
+      lastInboundAt = Date.now();
+      if (prev !== 0 && Date.now() - prev > HEARTBEAT_MS) {
+        console.log(`[harper] liveness: inbound resumed after ${Math.round((Date.now() - prev) / 1000)}s silence`);
+      }
+    }
+    probeFailStreak = 0;
+  };
 
   async function requestPairCode() {
     if (!config.pairFor || authState.state.creds.registered) return;
@@ -109,7 +145,35 @@ export async function startClient(handlers) {
     await tryOnce();
   }
 
+  // Tear down a socket PROPERLY. Never use sock.ws.close() - that leaks timers,
+  // listeners and leaves Baileys internally stuck, which itself causes zombies.
+  function teardown(code) {
+    if (!sock) return;
+    closing = true;
+    clearInterval(watchdogTimer);
+    watchdogTimer = null;
+    const s = sock;
+    sock = null;
+    try {
+      s.end(code || new Error('harper teardown'));
+    } catch (e) {
+      console.log(`[harper] teardown end() error: ${e.message}`);
+    }
+  }
+
+  function scheduleReconnect(delayMs) {
+    if (reconnectTimer) return;
+    const base = Math.min(delayMs || 1000, RESTART_MAX_DELAY_MS);
+    const jitter = Math.floor(Math.random() * 700);
+    console.log(`[harper] scheduling reconnect in ${Math.round((base + jitter) / 1000)}s`);
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      connect().catch((e) => console.log(`[harper] reconnect error: ${e.message}`));
+    }, base + jitter);
+  }
+
   const connect = async () => {
+    closing = false;
     try {
       authState = await buildAuthState();
     } catch (e) {
@@ -130,6 +194,7 @@ export async function startClient(handlers) {
         setLinkStatus('open');
         lastOpenAt = Date.now();
         expectingClose = false;
+        resetLiveness();
         console.log(`[harper] connected as ${sock.user?.id || 'unknown'}`);
         handlers?.onConnected?.(sock);
       }
@@ -148,45 +213,110 @@ export async function startClient(handlers) {
         }
 
         const replaced = code === DisconnectReason.connectionReplaced;
-        const baseDelay = replaced ? 6000 : 700;
-        const jitter = Math.floor(Math.random() * 700);
-        console.log(`[harper] scheduling reconnect in ${Math.round((baseDelay + jitter) / 1000)}s`);
-        reconnectTimer = setTimeout(() => {
-          connect().catch((e) => console.log(`[harper] reconnect error: ${e.message}`));
-        }, baseDelay + jitter);
+        scheduleReconnect(replaced ? 6000 : 700);
       }
     });
 
+    // ============================================================
+    // Multi-layer liveness watchdog.
+    //
+    // Layer 1 (raw WS):     treat a non-OPEN websocket as dead.
+    // Layer 2 (inbound):    if NO inbound frames (messages/receipts)
+    //                       arrive for HEARTBEAT_MS, we may be deaf
+    //                       even though the socket reports OPEN.
+    // Layer 3 (active probe): an onWhatsApp(self) request/distinct.
+    //                       It MUST traverse the receive path; if it
+    //                       doesn't answer we are definitively deaf.
+    //
+    // Recovery: first try a clean in-process reconnect (with backoff).
+    // If those keep coming up deaf (Koyeb keeps the socket muted), the
+    // only reliable fix is a full process restart - so we exit(1) and
+    // let the supervisor (Docker/Koyeb) recycle the container.
+    // ============================================================
     function startWatchdog() {
       if (watchdogTimer) clearInterval(watchdogTimer);
+
+      const runProbe = async () => {
+        const s = sock;
+        if (!s) return;
+        const ownNumber = s.user?.id?.split(':')[0]?.split('@')[0];
+        if (!ownNumber) return;
+        probeInFlight = true;
+        try {
+          await Promise.race([
+            s.onWhatsApp(ownNumber),
+            new Promise((_, rej) => setTimeout(() => rej(new Error('probe timeout')), PROBE_TIMEOUT_MS)),
+          ]);
+          lastInboundAt = Date.now();
+          lastProbeAt = Date.now();
+          probeFailStreak = 0;
+        } catch (e) {
+          probeFailStreak += 1;
+          console.log(`[harper] liveness probe FAILED (${probeFailStreak} streak): ${e.message}`);
+        } finally {
+          probeInFlight = false;
+        }
+      };
+
       watchdogTimer = setInterval(() => {
         try {
-          const ws = sock?.ws;
+          const s = sock;
           const registered = !!(authState?.state?.creds?.registered);
-          const wsDead = !ws || ws.readyState !== 1;
-          const stale = lastOpenAt && Date.now() - lastOpenAt > 45000;
-          if (wsDead && !expectingClose && !reconnectTimer) {
+          const now = Date.now();
+
+          // ---- Layer 1: hard transport death ---------------------
+          const ws = s?.ws;
+          if ((!ws || ws.readyState !== 1) && !expectingClose && !reconnectTimer && !closing) {
             console.log(`[harper] watchdog: socket dead (readyState=${ws ? ws.readyState : 'null'}) -> forcing reconnect`);
-            reconnectTimer = setTimeout(() => {
-              reconnectTimer = null;
-              connect().catch((e) => console.log(`[harper] watchdog reconnect error: ${e.message}`));
-            }, 300);
-          } else if (!wsDead && !stale && registered && Date.now() - lastOpenAt > 30000) {
-            console.log(`[harper] watchdog: connected but idle ${Math.round((Date.now() - lastOpenAt) / 1000)}s, sending ping`);
-            try {
-              sock.sendNode({ tag: 'iq', attrs: { to: 's.whatsapp.net', type: 'get', xmlns: 'w:p' }, content: [] });
-            } catch {}
-            lastOpenAt = Date.now();
+            teardown(new Error('dead socket'));
+            scheduleReconnect(300);
+            return;
+          }
+
+          if (!s || !registered || expectingClose || closing || reconnectTimer) return;
+
+          // ---- Layer 2: deaf-socket detection (no inbound flow) --
+          const silent = now - lastInboundAt;
+          if (silent > HEARTBEAT_MS && !probeInFlight) {
+            const sinceProbe = now - lastProbeAt;
+
+            // Send a raw keepalive ping to keep NAT/Koyeb edge awake;
+            // this also resets Baileys' own lastDateRecv staleness clock.
+            if (sinceProbe > 20000) {
+              try {
+                s.sendNode({ tag: 'iq', attrs: { to: 's.whatsapp.net', type: 'get', xmlns: 'w:p' }, content: [{ tag: 'ping', attrs: {} }] });
+              } catch {}
+            }
+
+            // Every PROBE_MS of silence, actively test the receive path.
+            if (silent > PROBE_MS) {
+              console.log(`[harper] watchdog: silent ${Math.round(silent / 1000)}s, probing receive path`);
+              runProbe().catch(() => {});
+            }
+          }
+
+          // ---- Layer 3: deaf recovery -----------------------------
+          if (probeFailStreak >= 2) {
+            console.log(`[harper] DEAF SOCKET confirmed (${probeFailStreak} failed probes, internet-flow silent) - restarting connection`);
+            probeFailStreak = 0;
+            deafRestarts += 1;
+            teardown(new Error('deaf socket'));
+            if (deafRestarts >= DEAF_RESTARTS_BEFORE_EXIT) {
+              console.log(`[harper] ${deafRestarts} deaf reconnects - in-process recovery not helping, hard-restarting process`);
+              process.exit(1);
+            }
+            scheduleReconnect(2000);
           }
         } catch (e) {
           console.log(`[harper] watchdog error: ${e.message}`);
         }
-      }, 15000);
+      }, WATCHDOG_MS);
     }
 
     startWatchdog();
 
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
+      markInbound();
       try {
         for (const msg of messages) {
           if (!msg?.key) continue;
@@ -202,6 +332,9 @@ export async function startClient(handlers) {
         console.log(`[harper] message handler error: ${e.message}`);
       }
     });
+
+    sock.ev.on('message-receipt.update', () => markInbound());
+    sock.ev.on('messages.update', () => markInbound());
 
     sock.ev.on('contacts.update', (contacts) => {
       try {

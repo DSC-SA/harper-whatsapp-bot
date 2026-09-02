@@ -11,7 +11,7 @@ export function startServer() {
 
   app.get('/health', (req, res) => {
     res.set('Cache-Control', 'no-store');
-    res.json({ status: 'ok', name: config.botName, uptime: process.uptime(), time: new Date().toISOString() });
+    res.json({ status: 'ok', name: config.botName, uptime: process.uptime(), time: new Date().toISOString(), whatsapp: getLinkStatus() });
   });
 
   app.get('/status', (req, res) => {
