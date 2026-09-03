@@ -319,8 +319,12 @@ export async function startClient(handlers) {
           const now = Date.now();
 
           // ---- Layer 1: hard transport death ---------------------
+          // NOTE: while unregistered (awaiting QR pairing), the socket is still
+          // negotiating and must NOT be torn down as "dead" - doing so regenerates
+          // a fresh QR each cycle and the user can never scan it. So Layer 1 only
+          // applies to a fully registered, previously-open session.
           const ws = s?.ws;
-          if ((!ws || ws.readyState !== 1) && !expectingClose && !reconnectTimer && !closing) {
+          if (registered && (!ws || ws.readyState !== 1) && !expectingClose && !reconnectTimer && !closing) {
             console.log(`[harper] watchdog: socket dead (readyState=${ws ? ws.readyState : 'null'}) -> forcing reconnect`);
             teardown(new Error('dead socket'));
             scheduleReconnect(300);
