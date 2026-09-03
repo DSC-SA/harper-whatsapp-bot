@@ -337,13 +337,14 @@ export async function startClient(handlers) {
           console.log('[harper] logged out. clear SESSION_ID and re-pair.');
           return;
         }
-        if (code === DisconnectReason.loggedOut && !registered) {
-          // WhatsApp 401-resigning an unregistered pairing attempt = the bot is
-          // being rejected at the account/registration level (flagged/throttled).
-          // Re-requesting pairing codes in a loop just worsens the flag. Stop
-          // auto-requesting and back off a long time before retrying.
+        if ((code === DisconnectReason.loggedOut || code === 405) && !registered) {
+          // WhatsApp rejecting an unregistered pairing attempt (401 loggedOut, or
+          // 405 method-not-allowed checking the client) = the bot is being
+          // refused at the account/registration level. Re-requesting pairing
+          // codes in a loop just hammers WhatsApp's servers and worsens any flag.
+          // Stop auto-requesting and hold until manually re-paired/restarted.
           pairingRejected = true;
-          console.log('[harper] pairing 401-rejected while unregistered - WhatsApp is refusing registration. Backing off and stopping code auto-request.');
+          console.log(`[harper] pairing ${code}-rejected while unregistered - WhatsApp is refusing registration. Backing off and stopping code auto-request.`);
           // no reconnect - hold until process is manually re-paired or restarted
           return;
         }
