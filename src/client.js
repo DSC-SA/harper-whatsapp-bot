@@ -33,15 +33,21 @@ function renderQrAscii(qr) {
 }
 
 let lastQr = ''; // dedupe: only emit a QR when it actually changes
+let lastQrAt = 0; // timestamp of the last accepted QR
+const QR_MIN_INTERVAL_MS = 11000; // force a stable window so a scan can land
 
 function showQr(qr) {
   if (!qr) return;
+  const now = Date.now();
   // Baileys can re-emit the same/rapid-fire session challenge; re-writing the
   // PNG and spamming the console on every single event races the user's scan
-  // (the QR keeps flipping before it can be scanned). Only honor an actual
-  // change in the QR payload.
+  // (the QR keeps flipping before it can be scanned). Enforce a minimum quiet
+  // window so the QR stays scannable for a beat. Only an actual change in the
+  // payload and a fresh cooldown is honored.
   if (qr === lastQr) return;
+  if (now - lastQrAt < QR_MIN_INTERVAL_MS && lastQrAt !== 0) return;
   lastQr = qr;
+  lastQrAt = now;
   console.log('[harper] Scan this QR in WhatsApp > Linked Devices to pair:');
   try {
     console.log(renderQrAscii(qr));
