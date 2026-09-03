@@ -12,6 +12,7 @@ import pino from 'pino';
 import { buildAuthState } from './session.js';
 import { config } from '../config.js';
 import { recordLidMapping, recordKeyMappings, recordGroupMappings } from './lidmap.js';
+import { saveBlob } from './db.js';
 import { setLinkStatus } from './link.js';
 import { registerRepair } from './repair.js';
 
@@ -162,43 +163,61 @@ export async function startClient(handlers) {
     probeFailStreak = 0;
   };
 
+  // Wrap requestPairingCode in a hard timeout: Baileys' requestPairingCode
+  // awaits sendPromise, which can hang forever when it thinks the socket is
+  // open but the underlying WS is already dead (common during QR churn). A race
+  // + timeout guarantees we never sit silently and always emit the code or a
+  // failure line.
   async function requestPairCode() {
     if (!config.pairFor || authState.state.creds.registered) return;
     if (pairCodeRequested) return;
     pairCodeRequested = true;
-    // During QR pairing Baileys keeps the WS in "connecting" (readyState 0),
-    // never reaching OPEN until the pairing completes. So we cannot wait for
-    // readyState===1 - requestPairingCode() must be issued on that same
-    // connecting socket (it sends an iq over it and returns the 8-digit code).
-    const sockExists = () => !!sock?.ws;
+
+    const PAIR_TIMEOUT_MS = 8000;
+    // Re-arm the latch once we become registered so a later reconnect (that
+    // would be pointless anyway) starts fresh. Guards against re-firing.
+    const clearLatch = () => { pairCodeRequested = false; };
+
     let attempts = 0;
     const tryOnce = async () => {
       if (authState.state.creds.registered) return;
-      if (!sockExists()) {
+      if (!sock?.ws) {
         attempts += 1;
         if (attempts < 40) setTimeout(tryOnce, 3000);
         else {
           console.log(`[harper] pairing-code: ws never created after ${attempts} waits`);
-          pairCodeRequested = false;
+          clearLatch();
         }
         return;
       }
+      const cur = sock;
       try {
-        const code = await sock.requestPairingCode(config.pairFor);
-        const msg = `[harper] PAIRING CODE for ${config.pairFor}: ${code}  (WhatsApp > Link a Device > Link with phone number instead)`;
-        console.log(msg);
+        const code = await Promise.race([
+          cur.requestPairingCode(config.pairFor),
+          new Promise((_, rej) => setTimeout(() => rej(new Error('timeout: no settling response')), PAIR_TIMEOUT_MS)),
+        ]);
+        if (authState.state.creds.registered) return;
+        console.log('\n' + '='.repeat(60));
+        console.log(`[harper] PAIRING CODE for ${config.pairFor}: ${code}`);
+        console.log('WhatsApp > Linked Devices > Link a device > Link with phone number instead');
+        console.log('='.repeat(60) + '\n');
         try {
           mkdirSync(dirname(config.qrFile), { recursive: true });
           writeFileSync('data/pairing_code.txt', code, 'utf8');
         } catch {}
+        try { await saveBlob('pairing_code.txt', Buffer.from(code, 'utf8')); } catch (e) { console.log(`[harper] pairing-code saveBlob error: ${e.message}`); }
       } catch (e) {
+        if (authState.state.creds.registered) return;
         attempts += 1;
-        console.log(`[harper] pairing-code request failed (${attempts}): ${e.message}`);
+        const stillSame = cur === sock; // only keep retrying on the same socket
+        console.log(`[harper] pairing-code request failed (${attempts}): ${e.message}${stillSame ? '' : ' (socket changed, will re-arm on next connect)'}`);
+        if (!stillSame) { clearLatch(); return; }
         if (attempts < 60) setTimeout(tryOnce, 5000);
         else {
           console.log(`[harper] pairing-code giving up after ${attempts} attempts`);
-          pairCodeRequested = false;
+          clearLatch();
         }
+        return;
       }
     };
     await tryOnce();
@@ -256,10 +275,12 @@ export async function startClient(handlers) {
     // repair flag is done; any later auto-reconnect uses the normal path.
     forceFreshQR = false;
 
-    // Pairing-code mode (config.pairFor set): request an 8-digit code so the
-    // bot can be linked from WhatsApp > Link a device > "with phone number
-    // instead". This is more reliable on Koyeb than QR scanning.
+    // Every connect() builds a fresh socket; re-arm the pairing-code latch so the
+    // current socket gets its own requestPairingCode() (the previous call hung
+    // on the old socket's dead sendPromise). Once we become registered the
+    // latch stays closed.
     if (!forceFreshQR) {
+      pairCodeRequested = false;
       requestPairCode();
     }
 
