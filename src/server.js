@@ -83,33 +83,41 @@ export function startServer() {
       var qrBox = document.querySelector('.qr');
       var okBox = document.getElementById('okBox');
       var waitBox = document.getElementById('waitBox');
-      var lastSrc = '';
+      var lastShown = '';
       function setQrSrc() {
         var s = qr.split('?')[0] + '?t=' + Date.now();
         img.src = s;
-        lastSrc = s;
       }
-      img.onload = function () {
-        waitBox.style.display = 'none';
-        qrBox.style.display = 'block';
-        okBox.style.display = 'none';
-      };
-      img.onerror = function () {
-        qrBox.style.display = 'none';
-        waitBox.style.display = 'block';
-        okBox.style.display = 'none';
-      };
-      fetch(statusUrl).then(function (r) { return r.json(); }).then(function (j) {
-        if (j.status === 'open') { qrBox.style.display = 'none'; waitBox.style.display = 'none'; okBox.style.display = 'block'; }
-      }).catch(function () {});
+      function showQrOrWait() {
+        if (img.complete && img.naturalWidth > 0) {
+          waitBox.style.display = 'none';
+          qrBox.style.display = 'block';
+          okBox.style.display = 'none';
+          lastShown = img.src;
+        } else {
+          qrBox.style.display = 'none';
+          waitBox.style.display = 'block';
+          okBox.style.display = 'none';
+        }
+      }
+      img.onload = function () { showQrOrWait(); };
+      img.onerror = function () { waitBox.style.display = 'block'; qrBox.style.display = 'none'; okBox.style.display = 'none'; };
+      // Keep the displayed QR in sync with the server: re-fetch the QR image on
+      // a short interval (with a cache-buster) so a freshly generated server QR
+      // replaces a stale one the user may have scanned. Also swap to the "ready"
+      // state as soon as the connection goes open.
       setQrSrc();
       setInterval(function () {
+        setQrSrc();
         fetch(statusUrl).then(function (r) { return r.json(); }).then(function (j) {
-          if (j.status === 'open') { qrBox.style.display = 'none'; waitBox.style.display = 'none'; okBox.style.display = 'block'; }
-          else { okBox.style.display = 'none'; if (img.complete && img.naturalWidth > 0) { qrBox.style.display = 'block'; } }
-        }).catch(function () {});
-        if (!(img.complete && img.naturalWidth > 0) || img.currentSrc !== lastSrc) setQrSrc();
-      }, 3000);
+          if (j.status === 'open') {
+            qrBox.style.display = 'none'; waitBox.style.display = 'none'; okBox.style.display = 'block';
+          } else {
+            okBox.style.display = 'none';
+            showQrOrWait();
+          }
+        }).catch(function () { showQrOrWait(); });
+      }, 4000);
     </script>
   </div>
 </body>

@@ -32,8 +32,16 @@ function renderQrAscii(qr) {
   return lines.join('\n');
 }
 
+let lastQr = ''; // dedupe: only emit a QR when it actually changes
+
 function showQr(qr) {
   if (!qr) return;
+  // Baileys can re-emit the same/rapid-fire session challenge; re-writing the
+  // PNG and spamming the console on every single event races the user's scan
+  // (the QR keeps flipping before it can be scanned). Only honor an actual
+  // change in the QR payload.
+  if (qr === lastQr) return;
+  lastQr = qr;
   console.log('[harper] Scan this QR in WhatsApp > Linked Devices to pair:');
   try {
     console.log(renderQrAscii(qr));
@@ -229,14 +237,12 @@ export async function startClient(handlers) {
 
     // Once the fresh socket is built (QR emitted on connect), the one-shot
     // repair flag is done; any later auto-reconnect uses the normal path.
-    const wasForceFresh = forceFreshQR;
     forceFreshQR = false;
 
-    // During a forced fresh-QR repair we must NOT auto-request a pairing
-    // code - we want the QR, not a code. Skip until this connect is done.
-    if (!wasForceFresh) {
-      await requestPairCode();
-    }
+    // Auto-calling requestPairingCode() when unpaired keeps the socket churning
+    // out fresh session challenges - the QR regenerates endlessly and a scan
+    // never lands. QR pairing is the default; a pairing code is only requested
+    // explicitly via the /pair command.
 
     sock.ev.on('creds.update', authState.saveCreds);
 
