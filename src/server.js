@@ -83,21 +83,33 @@ export function startServer() {
       var qrBox = document.querySelector('.qr');
       var okBox = document.getElementById('okBox');
       var waitBox = document.getElementById('waitBox');
-      function apply(s) {
-        var connected = s === 'open';
-        qrBox.style.display = connected ? 'none' : 'block';
-        okBox.style.display = connected ? 'block' : 'none';
-        waitBox.style.display = connected ? 'none' : 'none';
-        if (connected && img.src) { var t = img.src.split('?t=')[0]; img.src = t + '?t=' + Date.now(); }
+      var lastSrc = '';
+      function setQrSrc() {
+        var s = qr.split('?')[0] + '?t=' + Date.now();
+        img.src = s;
+        lastSrc = s;
       }
-      function refresh() {
-        if (img.src) img.src = qr.split('?')[0] + '?t=' + Date.now();
-        fetch(statusUrl).then(function(r){ return r.json(); }).then(function(j){ apply(j.status); }).catch(function(){});
-      }
-      img.onload = function(){ waitBox.style.display = 'none'; };
-      img.onerror = function(){ waitBox.style.display = 'block'; };
-      refresh();
-      setInterval(refresh, 2000);
+      img.onload = function () {
+        waitBox.style.display = 'none';
+        qrBox.style.display = 'block';
+        okBox.style.display = 'none';
+      };
+      img.onerror = function () {
+        qrBox.style.display = 'none';
+        waitBox.style.display = 'block';
+        okBox.style.display = 'none';
+      };
+      fetch(statusUrl).then(function (r) { return r.json(); }).then(function (j) {
+        if (j.status === 'open') { qrBox.style.display = 'none'; waitBox.style.display = 'none'; okBox.style.display = 'block'; }
+      }).catch(function () {});
+      setQrSrc();
+      setInterval(function () {
+        fetch(statusUrl).then(function (r) { return r.json(); }).then(function (j) {
+          if (j.status === 'open') { qrBox.style.display = 'none'; waitBox.style.display = 'none'; okBox.style.display = 'block'; }
+          else { okBox.style.display = 'none'; if (img.complete && img.naturalWidth > 0) { qrBox.style.display = 'block'; } }
+        }).catch(function () {});
+        if (!(img.complete && img.naturalWidth > 0) || img.currentSrc !== lastSrc) setQrSrc();
+      }, 3000);
     </script>
   </div>
 </body>
