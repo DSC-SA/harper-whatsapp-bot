@@ -2,6 +2,7 @@ import {
   makeWASocket,
   DisconnectReason,
   makeCacheableSignalKeyStore,
+  fetchLatestBaileysVersion,
   Browsers,
 } from '@whiskeysockets/baileys';
 import qrcodeTerminal from 'qrcode-terminal';
@@ -69,19 +70,12 @@ function showQr(qr) {
 }
 
 async function makeSock(authState) {
-  // Pin the WhatsApp client version instead of always taking the latest from
-  // fetchLatestBaileysVersion(). Newly-rolled server versions get 401/405-rejected
-  // during pairing for many Baileys users (the "version fingerprint" problem),
-  // so we want a stable, known-good version. Override with WA_VERSION env like
-  // "3000.1037641644" (minor.micro) -> [2, 3000, 1037641644].
-  let version;
-  const pinned = process.env.WA_VERSION;
-  if (pinned) {
-    const parts = pinned.split('.').map((n) => parseInt(n, 10));
-    version = [2, parts[0] || 3000, parts[1] || 0];
-  } else {
-    version = [2, 3000, 1037641644];
-  }
+  // Use the live WA version from Baileys. We no longer hard-pin: a stale pinned
+  // version triggers a separate <failure reason='405'> (client_too_old) when
+  // Meta bumps the expected revision. The 405-on-PAIRING that affects 6.7.x is
+  // the Platform.WEB rejection (see PR #2365/#2377) - already patched at build
+  // time via scripts/patch-wa-platform.mjs, which swaps it to MACOS.
+  const { version } = await fetchLatestBaileysVersion();
   const browser = Browsers.macOS('Chrome');
   console.log(`[harper] using WA version ${version.join('.')} browser ${JSON.stringify(browser)}`);
   return makeWASocket({
