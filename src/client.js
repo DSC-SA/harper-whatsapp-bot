@@ -2,7 +2,7 @@ import {
   makeWASocket,
   DisconnectReason,
   makeCacheableSignalKeyStore,
-  fetchLatestBaileysVersion,
+  Browsers,
 } from '@whiskeysockets/baileys';
 import qrcodeTerminal from 'qrcode-terminal';
 import QRCode from 'qrcode';
@@ -69,11 +69,25 @@ function showQr(qr) {
 }
 
 async function makeSock(authState) {
-  const { version } = await fetchLatestBaileysVersion();
+  // Pin the WhatsApp client version instead of always taking the latest from
+  // fetchLatestBaileysVersion(). Newly-rolled server versions get 401/405-rejected
+  // during pairing for many Baileys users (the "version fingerprint" problem),
+  // so we want a stable, known-good version. Override with WA_VERSION env like
+  // "3000.1037641644" (minor.micro) -> [2, 3000, 1037641644].
+  let version;
+  const pinned = process.env.WA_VERSION;
+  if (pinned) {
+    const parts = pinned.split('.').map((n) => parseInt(n, 10));
+    version = [2, parts[0] || 3000, parts[1] || 0];
+  } else {
+    version = [2, 3000, 1037641644];
+  }
+  const browser = Browsers.macOS('Chrome');
+  console.log(`[harper] using WA version ${version.join('.')} browser ${JSON.stringify(browser)}`);
   return makeWASocket({
     version,
     logger,
-    browser: [config.botName, 'Chrome', 'Harper'],
+    browser,
     auth: {
       creds: authState.state.creds,
       keys: makeCacheableSignalKeyStore(authState.state.keys, logger),
