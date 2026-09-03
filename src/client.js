@@ -262,18 +262,29 @@ export async function startClient(handlers) {
       if (connection === 'close') {
         setLinkStatus('connecting');
         expectingClose = true;
-        const code = lastDisconnect?.error?.output?.statusCode;
+        const code = lastDisconnect?.error?.output?.statusCode || lastDisconnect?.error?.status;
         const registered = !!(authState?.state?.creds?.registered);
         const errMsg = lastDisconnect?.error?.message || '';
-        console.log(`[harper] connection closed (code=${code}, registered=${registered})${errMsg ? ` :: ${errMsg}` : ''}`);
+        const errReason = lastDisconnect?.error?.data?.reason || lastDisconnect?.error?.reason || '';
+        const errDesc = lastDisconnect?.error?.data && JSON.stringify(lastDisconnect.error.data);
+        console.log(
+          `[harper] connection closed (code=${code}, registered=${registered})` +
+          (errMsg ? ` :: ${errMsg}` : '') +
+          (errReason ? ` [reason=${errReason}]` : '') +
+          (errDesc ? ` [data=${errDesc}]` : '')
+        );
 
         if (code === DisconnectReason.loggedOut && registered) {
           console.log('[harper] logged out. clear SESSION_ID and re-pair.');
           return;
         }
-
-        const replaced = code === DisconnectReason.connectionReplaced;
-        scheduleReconnect(replaced ? 6000 : 700);
+        if (code === DisconnectReason.connectionReplaced) {
+          console.log('[harper] connection replaced (conflict). Another instance with this session is live.');
+          return;
+        }
+        // Not logged out/replaced; reconnect (700ms) so a fresh QR handshake can
+        // start again. Forcing a new session challenge is handled by the retry.
+        scheduleReconnect(700);
       }
     });
 
