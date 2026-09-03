@@ -25,6 +25,7 @@ process.on('uncaughtException', (err) => {
 });
 process.on('unhandledRejection', (reason) => {
   console.log(`[harper] unhandledRejection: ${reason?.message || reason}`);
+  if (reason?.stack) console.log(reason.stack);
 });
 
 async function main() {

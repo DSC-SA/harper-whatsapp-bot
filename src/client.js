@@ -6,8 +6,8 @@ import {
 } from '@whiskeysockets/baileys';
 import qrcodeTerminal from 'qrcode-terminal';
 import QRCode from 'qrcode';
-import { mkdirSync, writeFileSync, existsSync, unlinkSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import pino from 'pino';
 import { buildAuthState } from './session.js';
 import { config } from '../config.js';
@@ -19,12 +19,12 @@ const logger = pino({ level: (process.env.LOG_LEVEL || 'warn'), name: 'harper' }
 
 function renderQrAscii(qr) {
   const qrObj = QRCode.create(qr);
-  const count = qrObj.modules.size;
-  const isDark = (r, c) => qrObj.modules.get(r).get(c);
+  const size = qrObj.modules.size;
+  const isDark = (r, c) => qrObj.modules.get(r, c);
   const lines = [];
-  for (let r = 0; r < count; r++) {
+  for (let r = 0; r < size; r++) {
     let row = '';
-    for (let c = 0; c < count; c++) {
+    for (let c = 0; c < size; c++) {
       row += isDark(r, c) ? '\u2588\u2588' : '  ';
     }
     lines.push(row);
@@ -33,8 +33,13 @@ function renderQrAscii(qr) {
 }
 
 function showQr(qr) {
+  if (!qr) return;
   console.log('[harper] Scan this QR in WhatsApp > Linked Devices to pair:');
-  console.log(renderQrAscii(qr));
+  try {
+    console.log(renderQrAscii(qr));
+  } catch (e) {
+    console.log(`[harper] (qr preview unavailable: ${e.message})`);
+  }
   QRCode.toFile(config.qrFile, qr, { width: 640, margin: 2 })
     .then(() => console.log(`[harper] QR image saved: ${config.qrFile} (refreshes until scanned)`))
     .catch(async (e) => {
@@ -78,7 +83,32 @@ const PROBE_TIMEOUT_MS = 20000;      // how long we wait for a probe answer befo
 const RESTART_MAX_DELAY_MS = 30000;  // cap on reconnect backoff
 const DEAF_RESTARTS_BEFORE_EXIT = 2; // deaf reconnects before we hard-restart the process
 
-const FORCE_FRESH_FILE = join(config.sessionDir, 'force_fresh.flag');
+const FORCE_FRESH_KEY = 'force_fresh'; // DB blob flag that survives container recycle
+
+async function readForceFresh() {
+  try {
+    const { loadBlob } = await import('./db.js');
+    return !!(await loadBlob(FORCE_FRESH_KEY));
+  } catch {
+    return false;
+  }
+}
+
+async function writeForceFresh() {
+  try {
+    const { saveBlob } = await import('./db.js');
+    await saveBlob(FORCE_FRESH_KEY, '1');
+  } catch (e) {
+    console.log(`[harper] failed to write force-fresh flag: ${e.message}`);
+  }
+}
+
+async function clearForceFresh() {
+  try {
+    const { deleteBlob } = await import('./db.js');
+    await deleteBlob(FORCE_FRESH_KEY);
+  } catch {}
+}
 
 export async function startClient(handlers) {
   let sock = null;
@@ -179,13 +209,13 @@ export async function startClient(handlers) {
   const connect = async () => {
     closing = false;
 
-    // A forced fresh re-pair survives across a process restart via a marker
-    // file: after a hard exit+recycle the container boots clean, checks the
-    // marker, and builds a fresh auth state that emits a brand-new QR (this
+    // A forced fresh re-pair survives across a container recycle via a DB blob
+    // flag. After the hard exit+recycle the process boots, sees the flag, and
+    // builds a clean unregistered auth state that emits a brand-new QR - this
     // clears any stale Baileys WebSocket state that made in-process re-links
-    // get stuck in "connecting" without ever emitting a QR).
-    if (existsSync(FORCE_FRESH_FILE)) {
-      try { unlinkSync(FORCE_FRESH_FILE); } catch {}
+    // get stuck in "connecting" without ever emitting a QR.
+    if (await readForceFresh()) {
+      await clearForceFresh();
       forceFreshQR = true;
     }
 
@@ -396,24 +426,19 @@ export async function startClient(handlers) {
   const handle = {
     getSock: () => sock,
     logger,
-    // Force a fresh re-link: mark a hard process restart that will boot into a
-    // clean, unregistered QR-request state. We exit(1) so the container
-    // recycles - in-process reconnects of a fresh socket kept getting stuck in
-    // "connecting" without emitting a QR due to stale Baileys WS state. The
-    // stored session is NOT wiped; it's simply not used on the next boot.
+    // Force a fresh re-link: persist a DB flag and hard-restart the process. The
+    // recycled container boots, sees the flag, builds a clean unregistered auth
+    // state and emits a fresh QR. (Disk markers don't survive Koyeb's container
+    // recycle, so the flag lives in Postgres.) The stored session is NOT wiped;
+    // it's simply not used on the next boot.
     forceFreshPair: () => {
       if (closing || forceFreshQR) return false;
       console.log('[harper] FORCED fresh re-pair requested - hard-restarting to show a fresh QR');
-      try {
-        mkdirSync(config.sessionDir, { recursive: true });
-        writeFileSync(FORCE_FRESH_FILE, '1', 'utf8');
-      } catch (e) {
-        console.log(`[harper] failed to write fresh-pair marker: ${e.message}`);
-      }
-      teardown(new Error('forced re-pair'));
-      setLinkStatus('connecting');
-      // Give the marker flush a tick before the hard exit.
-      setTimeout(() => process.exit(1), 300);
+      writeForceFresh().then(() => {
+        teardown(new Error('forced re-pair'));
+        setLinkStatus('connecting');
+        setTimeout(() => process.exit(1), 300);
+      });
       return true;
     },
   };
