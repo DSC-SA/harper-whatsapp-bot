@@ -166,7 +166,7 @@ export async function startClient(handlers) {
     if (!config.pairFor || authState.state.creds.registered) return;
     if (pairCodeRequested) return;
     pairCodeRequested = true;
-    const wsOpen = () => sock?.ws && sock.ws.readyState === 1;
+    const wsOpen = () => sock?.ws && (sock.ws.readyState === 1 || sock.ws.readyState === 0);
     let attempts = 0;
     const tryOnce = async () => {
       if (!wsOpen()) {
@@ -245,10 +245,12 @@ export async function startClient(handlers) {
     // repair flag is done; any later auto-reconnect uses the normal path.
     forceFreshQR = false;
 
-    // Auto-calling requestPairingCode() when unpaired keeps the socket churning
-    // out fresh session challenges - the QR regenerates endlessly and a scan
-    // never lands. QR pairing is the default; a pairing code is only requested
-    // explicitly via the /pair command.
+    // Pairing-code mode (config.pairFor set): request an 8-digit code so the
+    // bot can be linked from WhatsApp > Link a device > "with phone number
+    // instead". This is more reliable on Koyeb than QR scanning.
+    if (!forceFreshQR) {
+      requestPairCode();
+    }
 
     sock.ev.on('creds.update', authState.saveCreds);
 
