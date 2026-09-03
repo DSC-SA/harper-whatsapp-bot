@@ -47,8 +47,8 @@ export function startServer() {
 
   app.get('/', (req, res) => {
     const base = (config.appUrl || '').replace(/\/+$/, '');
-    const qrUrl = encodeURIComponent(`${base}/qr.png`);
-    const statusEndpoint = encodeURIComponent(`${base}/status`);
+    const qrUrl = `${base}/qr.png`;
+    const statusEndpoint = `${base}/status`;
     res.set('Content-Type', 'text/html; charset=utf-8');
     res.send(`<!doctype html>
 <html lang="en">
