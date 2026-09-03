@@ -166,15 +166,19 @@ export async function startClient(handlers) {
     if (!config.pairFor || authState.state.creds.registered) return;
     if (pairCodeRequested) return;
     pairCodeRequested = true;
-    const wsOpen = () => sock?.ws && sock.ws.readyState === 1;
+    // During QR pairing Baileys keeps the WS in "connecting" (readyState 0),
+    // never reaching OPEN until the pairing completes. So we cannot wait for
+    // readyState===1 - requestPairingCode() must be issued on that same
+    // connecting socket (it sends an iq over it and returns the 8-digit code).
+    const sockExists = () => !!sock?.ws;
     let attempts = 0;
     const tryOnce = async () => {
       if (authState.state.creds.registered) return;
-      if (!wsOpen()) {
+      if (!sockExists()) {
         attempts += 1;
         if (attempts < 40) setTimeout(tryOnce, 3000);
         else {
-          console.log(`[harper] pairing-code: ws not open after ${attempts} waits; will keep waiting`);
+          console.log(`[harper] pairing-code: ws never created after ${attempts} waits`);
           pairCodeRequested = false;
         }
         return;
