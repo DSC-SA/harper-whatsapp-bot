@@ -166,11 +166,17 @@ export async function startClient(handlers) {
     if (!config.pairFor || authState.state.creds.registered) return;
     if (pairCodeRequested) return;
     pairCodeRequested = true;
-    const wsOpen = () => sock?.ws && (sock.ws.readyState === 1 || sock.ws.readyState === 0);
+    const wsOpen = () => sock?.ws && sock.ws.readyState === 1;
     let attempts = 0;
     const tryOnce = async () => {
+      if (authState.state.creds.registered) return;
       if (!wsOpen()) {
-        if (attempts < 20) setTimeout(tryOnce, 3000);
+        attempts += 1;
+        if (attempts < 40) setTimeout(tryOnce, 3000);
+        else {
+          console.log(`[harper] pairing-code: ws not open after ${attempts} waits; will keep waiting`);
+          pairCodeRequested = false;
+        }
         return;
       }
       try {
@@ -183,9 +189,10 @@ export async function startClient(handlers) {
         } catch {}
       } catch (e) {
         attempts += 1;
-        if (attempts < 15) setTimeout(tryOnce, 8000);
+        console.log(`[harper] pairing-code request failed (${attempts}): ${e.message}`);
+        if (attempts < 60) setTimeout(tryOnce, 5000);
         else {
-          console.log(`[harper] giving up on pairing code after ${attempts} attempts`);
+          console.log(`[harper] pairing-code giving up after ${attempts} attempts`);
           pairCodeRequested = false;
         }
       }
