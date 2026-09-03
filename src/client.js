@@ -183,6 +183,7 @@ export async function startClient(handlers) {
     let attempts = 0;
     const tryOnce = async () => {
       if (authState.state.creds.registered) return;
+      if (pairingRejected) { pairCodeRequested = false; return; }
       if (!sock?.ws) {
         attempts += 1;
         if (attempts < 40) setTimeout(tryOnce, 3000);
@@ -210,6 +211,7 @@ export async function startClient(handlers) {
         try { await saveBlob('pairing_code.txt', Buffer.from(code, 'utf8')); } catch (e) { console.log(`[harper] pairing-code saveBlob error: ${e.message}`); }
       } catch (e) {
         if (authState.state.creds.registered) return;
+        if (pairingRejected) { clearLatch(); return; } // WhatsApp 401-rejected; stop retrying
         attempts += 1;
         const stillSame = cur === sock; // only keep retrying on the same socket
         console.log(`[harper] pairing-code request failed (${attempts}): ${e.message}${stillSame ? '' : ' (socket changed, will re-arm on next connect)'}`);
