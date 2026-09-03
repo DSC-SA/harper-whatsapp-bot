@@ -288,8 +288,20 @@ export async function startClient(handlers) {
           console.log('[harper] connection replaced (conflict). Another instance with this session is live.');
           return;
         }
-        // Not logged out/replaced; reconnect (700ms) so a fresh QR handshake can
-        // start again. Forcing a new session challenge is handled by the retry.
+        if (code === DisconnectReason.restartRequired) {
+          // Baileys explicitly signals the process must restart (not just the
+          // socket). Soft-reconnecting into the same broken stream just mints a
+          // fresh QR in a loop and a scan never lands. Cleanly exit so Koyeb
+          // recycles the container and we start a brand-new session handshake.
+          console.log('[harper] restartRequired (515) - hard-restarting process for a clean session');
+          teardown(new Error('restart required'));
+          setLinkStatus('connecting');
+          setTimeout(() => process.exit(1), 500);
+          return;
+        }
+        // Not logged out/replaced/restart-required; reconnect (700ms) so a fresh
+        // QR handshake can start again. Forcing a new session challenge is
+        // handled by the retry.
         scheduleReconnect(700);
       }
     });
