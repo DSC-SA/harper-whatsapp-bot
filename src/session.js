@@ -101,16 +101,22 @@ export async function buildAuthState(fresh = false) {
   };
 
   const saveCreds = async () => {
+    // Only persist once the device is actually registered. Saving a
+    // pre-registration snapshot (registered:false, incomplete identity) is what
+    // caused the bot to reconnect in a 440-conflict loop and fail to decrypt
+    // (session loaded as "unregistered" even though it was linked). We still
+    // keep the in-memory creds always, so interim updates during registration
+    // are fine - we just don't clobber the durable copy until registration.
+    const cur = creds;
+    const isRegistered = !!(cur && cur.registered);
     sessionString = encodeSessionString({ creds, keys: keysObj });
-    await writeState(creds, keysObj);
-    // Persist to the database too so the session survives Koyeb's ephemeral
-    // disk on the next redeploy. Load order: env SESSION_ID > harper_session
-    // blob > local disk - so writing the blob guarantees a restart keeps the
-    // freshly-scanned session alive.
-    try {
-      const { saveBlob } = await import('./db.js');
-      await saveBlob('harper_session', sessionString);
-    } catch {}
+    if (isRegistered) {
+      await writeState(creds, keysObj);
+      try {
+        const { saveBlob } = await import('./db.js');
+        await saveBlob('harper_session', sessionString);
+      } catch {}
+    }
   };
 
   const state = { creds, keys: store };
