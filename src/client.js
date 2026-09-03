@@ -132,6 +132,8 @@ export async function startClient(handlers) {
   let pairCodeRequested = false;
   let watchdogTimer = null;
   let lastOpenAt = 0;
+  let reconnectAttempts = 0; // consecutive reconnect backoff counter
+  let pairingRejected = false; // set when WhatsApp 401-rejects an unregistered pairing
   let expectingClose = false;
 
   let lastInboundAt = 0;          // last time any inbound frame arrived (messages/receipts)
@@ -241,13 +243,19 @@ export async function startClient(handlers) {
 
   function scheduleReconnect(delayMs) {
     if (reconnectTimer) return;
-    const base = Math.min(delayMs || 1000, RESTART_MAX_DELAY_MS);
+    // Exponential backoff: 1s -> 2s -> 4s -> ... capped at RESTART_MAX_DELAY_MS.
+    // Prevents a 401/bad-session rejection from becoming a reconnect+re-pair
+    // storm that WhatsApp reads as abuse (which is what kept the number flagged).
+    reconnectAttempts += 1;
+    const exp = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), RESTART_MAX_DELAY_MS);
+    const base = delayMs ? Math.max(delayMs, exp) : exp;
     const jitter = Math.floor(Math.random() * 700);
-    console.log(`[harper] scheduling reconnect in ${Math.round((base + jitter) / 1000)}s`);
+    const total = base + jitter;
+    console.log(`[harper] scheduling reconnect in ${Math.round(total / 1000)}s`);
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
       connect().catch((e) => console.log(`[harper] reconnect error: ${e.message}`));
-    }, base + jitter);
+    }, total);
   }
 
   const connect = async () => {
@@ -279,7 +287,7 @@ export async function startClient(handlers) {
     // current socket gets its own requestPairingCode() (the previous call hung
     // on the old socket's dead sendPromise). Once we become registered the
     // latch stays closed.
-    if (!forceFreshQR) {
+    if (!forceFreshQR && !pairingRejected) {
       pairCodeRequested = false;
       requestPairCode();
     }
@@ -294,6 +302,7 @@ export async function startClient(handlers) {
         setLinkStatus('open');
         lastOpenAt = Date.now();
         expectingClose = false;
+        reconnectAttempts = 0; // successful connection resets the backoff counter
         resetLiveness();
         console.log(`[harper] connected as ${sock.user?.id || 'unknown'}`);
         handlers?.onConnected?.(sock);
@@ -318,6 +327,16 @@ export async function startClient(handlers) {
           console.log('[harper] logged out. clear SESSION_ID and re-pair.');
           return;
         }
+        if (code === DisconnectReason.loggedOut && !registered) {
+          // WhatsApp 401-resigning an unregistered pairing attempt = the bot is
+          // being rejected at the account/registration level (flagged/throttled).
+          // Re-requesting pairing codes in a loop just worsens the flag. Stop
+          // auto-requesting and back off a long time before retrying.
+          pairingRejected = true;
+          console.log('[harper] pairing 401-rejected while unregistered - WhatsApp is refusing registration. Backing off and stopping code auto-request.');
+          // no reconnect - hold until process is manually re-paired or restarted
+          return;
+        }
         if (code === DisconnectReason.connectionReplaced) {
           console.log('[harper] connection replaced (conflict). Another instance with this session is live.');
           return;
@@ -333,10 +352,9 @@ export async function startClient(handlers) {
           setTimeout(() => process.exit(1), 500);
           return;
         }
-        // Not logged out/replaced/restart-required; reconnect (700ms) so a fresh
-        // QR handshake can start again. Forcing a new session challenge is
-        // handled by the retry.
-        scheduleReconnect(700);
+        // Other disconnects: reconnect with exponential backoff (not a fixed
+        // tight loop). Forcing a new session challenge is handled by the retry.
+        scheduleReconnect();
       }
     });
 
